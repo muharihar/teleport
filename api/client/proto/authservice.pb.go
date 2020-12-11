@@ -2835,6 +2835,202 @@ func (m *DeleteAppSessionRequest) GetSessionID() string {
 	return ""
 }
 
+// GetWebSessionRequest are the parameters used to request a regular web session.
+type GetWebSessionRequest struct {
+	// SessionID is the ID of the session being requested.
+	SessionID            string   `protobuf:"bytes,1,opt,name=SessionID,proto3" json:"session_id"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *GetWebSessionRequest) Reset()         { *m = GetWebSessionRequest{} }
+func (m *GetWebSessionRequest) String() string { return proto.CompactTextString(m) }
+func (*GetWebSessionRequest) ProtoMessage()    {}
+func (*GetWebSessionRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_authservice_743af4c799734362, []int{37}
+}
+func (m *GetWebSessionRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *GetWebSessionRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_GetWebSessionRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (dst *GetWebSessionRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetWebSessionRequest.Merge(dst, src)
+}
+func (m *GetWebSessionRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *GetWebSessionRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_GetWebSessionRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GetWebSessionRequest proto.InternalMessageInfo
+
+func (m *GetWebSessionRequest) GetSessionID() string {
+	if m != nil {
+		return m.SessionID
+	}
+	return ""
+}
+
+// GetWebSessionResponse contains the requested web session.
+type GetWebSessionResponse struct {
+	// Session is the web session.
+	Session              *services.WebSessionV2 `protobuf:"bytes,1,opt,name=Session" json:"session"`
+	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
+	XXX_unrecognized     []byte                 `json:"-"`
+	XXX_sizecache        int32                  `json:"-"`
+}
+
+func (m *GetWebSessionResponse) Reset()         { *m = GetWebSessionResponse{} }
+func (m *GetWebSessionResponse) String() string { return proto.CompactTextString(m) }
+func (*GetWebSessionResponse) ProtoMessage()    {}
+func (*GetWebSessionResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_authservice_743af4c799734362, []int{38}
+}
+func (m *GetWebSessionResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *GetWebSessionResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_GetWebSessionResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (dst *GetWebSessionResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetWebSessionResponse.Merge(dst, src)
+}
+func (m *GetWebSessionResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *GetWebSessionResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_GetWebSessionResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GetWebSessionResponse proto.InternalMessageInfo
+
+func (m *GetWebSessionResponse) GetSession() *services.WebSessionV2 {
+	if m != nil {
+		return m.Session
+	}
+	return nil
+}
+
+// GetWebSessionsResponse contains all the requested web sessions.
+type GetWebSessionsResponse struct {
+	// Sessions is a list of web sessions.
+	Sessions             []*services.WebSessionV2 `protobuf:"bytes,1,rep,name=Sessions" json:"sessions"`
+	XXX_NoUnkeyedLiteral struct{}                 `json:"-"`
+	XXX_unrecognized     []byte                   `json:"-"`
+	XXX_sizecache        int32                    `json:"-"`
+}
+
+func (m *GetWebSessionsResponse) Reset()         { *m = GetWebSessionsResponse{} }
+func (m *GetWebSessionsResponse) String() string { return proto.CompactTextString(m) }
+func (*GetWebSessionsResponse) ProtoMessage()    {}
+func (*GetWebSessionsResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_authservice_743af4c799734362, []int{39}
+}
+func (m *GetWebSessionsResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *GetWebSessionsResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_GetWebSessionsResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (dst *GetWebSessionsResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetWebSessionsResponse.Merge(dst, src)
+}
+func (m *GetWebSessionsResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *GetWebSessionsResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_GetWebSessionsResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GetWebSessionsResponse proto.InternalMessageInfo
+
+func (m *GetWebSessionsResponse) GetSessions() []*services.WebSessionV2 {
+	if m != nil {
+		return m.Sessions
+	}
+	return nil
+}
+
+// DeleteWebSessionRequest contains the parameters used to remove a web session.
+type DeleteWebSessionRequest struct {
+	// SessionID specifies the session ID to remove
+	SessionID            string   `protobuf:"bytes,1,opt,name=SessionID,proto3" json:"session_id"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *DeleteWebSessionRequest) Reset()         { *m = DeleteWebSessionRequest{} }
+func (m *DeleteWebSessionRequest) String() string { return proto.CompactTextString(m) }
+func (*DeleteWebSessionRequest) ProtoMessage()    {}
+func (*DeleteWebSessionRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_authservice_743af4c799734362, []int{40}
+}
+func (m *DeleteWebSessionRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *DeleteWebSessionRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_DeleteWebSessionRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (dst *DeleteWebSessionRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DeleteWebSessionRequest.Merge(dst, src)
+}
+func (m *DeleteWebSessionRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *DeleteWebSessionRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_DeleteWebSessionRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_DeleteWebSessionRequest proto.InternalMessageInfo
+
+func (m *DeleteWebSessionRequest) GetSessionID() string {
+	if m != nil {
+		return m.SessionID
+	}
+	return ""
+}
+
 // GetKubeServicesRequest are the parameters used to request kubernetes services.
 type GetKubeServicesRequest struct {
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -3102,6 +3298,10 @@ func init() {
 	proto.RegisterType((*CreateAppSessionRequest)(nil), "proto.CreateAppSessionRequest")
 	proto.RegisterType((*CreateAppSessionResponse)(nil), "proto.CreateAppSessionResponse")
 	proto.RegisterType((*DeleteAppSessionRequest)(nil), "proto.DeleteAppSessionRequest")
+	proto.RegisterType((*GetWebSessionRequest)(nil), "proto.GetWebSessionRequest")
+	proto.RegisterType((*GetWebSessionResponse)(nil), "proto.GetWebSessionResponse")
+	proto.RegisterType((*GetWebSessionsResponse)(nil), "proto.GetWebSessionsResponse")
+	proto.RegisterType((*DeleteWebSessionRequest)(nil), "proto.DeleteWebSessionRequest")
 	proto.RegisterType((*GetKubeServicesRequest)(nil), "proto.GetKubeServicesRequest")
 	proto.RegisterType((*GetKubeServicesResponse)(nil), "proto.GetKubeServicesResponse")
 	proto.RegisterType((*UpsertKubeServiceRequest)(nil), "proto.UpsertKubeServiceRequest")
@@ -3199,6 +3399,14 @@ type AuthServiceClient interface {
 	DeleteAppSession(ctx context.Context, in *DeleteAppSessionRequest, opts ...grpc.CallOption) (*empty.Empty, error)
 	// DeleteAllAppSessions removes all application web sessions.
 	DeleteAllAppSessions(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*empty.Empty, error)
+	// GetWebSession gets a web session.
+	GetWebSession(ctx context.Context, in *GetWebSessionRequest, opts ...grpc.CallOption) (*GetWebSessionResponse, error)
+	// GetWebSessions gets all web sessions.
+	GetWebSessions(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*GetWebSessionsResponse, error)
+	// DeleteWebSession deletes a web session.
+	DeleteWebSession(ctx context.Context, in *DeleteWebSessionRequest, opts ...grpc.CallOption) (*empty.Empty, error)
+	// DeleteAllWebSessions deletes all web sessions.
+	DeleteAllWebSessions(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*empty.Empty, error)
 	// UpdateRemoteCluster updates remote cluster
 	UpdateRemoteCluster(ctx context.Context, in *services.RemoteClusterV3, opts ...grpc.CallOption) (*empty.Empty, error)
 	// GetKubeServices gets all kubernetes services.
@@ -3645,6 +3853,42 @@ func (c *authServiceClient) DeleteAllAppSessions(ctx context.Context, in *empty.
 	return out, nil
 }
 
+func (c *authServiceClient) GetWebSession(ctx context.Context, in *GetWebSessionRequest, opts ...grpc.CallOption) (*GetWebSessionResponse, error) {
+	out := new(GetWebSessionResponse)
+	err := c.cc.Invoke(ctx, "/proto.AuthService/GetWebSession", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) GetWebSessions(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*GetWebSessionsResponse, error) {
+	out := new(GetWebSessionsResponse)
+	err := c.cc.Invoke(ctx, "/proto.AuthService/GetWebSessions", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) DeleteWebSession(ctx context.Context, in *DeleteWebSessionRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
+	err := c.cc.Invoke(ctx, "/proto.AuthService/DeleteWebSession", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) DeleteAllWebSessions(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
+	err := c.cc.Invoke(ctx, "/proto.AuthService/DeleteAllWebSessions", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *authServiceClient) UpdateRemoteCluster(ctx context.Context, in *services.RemoteClusterV3, opts ...grpc.CallOption) (*empty.Empty, error) {
 	out := new(empty.Empty)
 	err := c.cc.Invoke(ctx, "/proto.AuthService/UpdateRemoteCluster", in, out, opts...)
@@ -3771,6 +4015,14 @@ type AuthServiceServer interface {
 	DeleteAppSession(context.Context, *DeleteAppSessionRequest) (*empty.Empty, error)
 	// DeleteAllAppSessions removes all application web sessions.
 	DeleteAllAppSessions(context.Context, *empty.Empty) (*empty.Empty, error)
+	// GetWebSession gets a web session.
+	GetWebSession(context.Context, *GetWebSessionRequest) (*GetWebSessionResponse, error)
+	// GetWebSessions gets all web sessions.
+	GetWebSessions(context.Context, *empty.Empty) (*GetWebSessionsResponse, error)
+	// DeleteWebSession deletes a web session.
+	DeleteWebSession(context.Context, *DeleteWebSessionRequest) (*empty.Empty, error)
+	// DeleteAllWebSessions deletes all web sessions.
+	DeleteAllWebSessions(context.Context, *empty.Empty) (*empty.Empty, error)
 	// UpdateRemoteCluster updates remote cluster
 	UpdateRemoteCluster(context.Context, *services.RemoteClusterV3) (*empty.Empty, error)
 	// GetKubeServices gets all kubernetes services.
@@ -4475,6 +4727,78 @@ func _AuthService_DeleteAllAppSessions_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_GetWebSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetWebSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).GetWebSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/proto.AuthService/GetWebSession",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).GetWebSession(ctx, req.(*GetWebSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_GetWebSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(empty.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).GetWebSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/proto.AuthService/GetWebSessions",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).GetWebSessions(ctx, req.(*empty.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_DeleteWebSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteWebSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).DeleteWebSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/proto.AuthService/DeleteWebSession",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).DeleteWebSession(ctx, req.(*DeleteWebSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_DeleteAllWebSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(empty.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).DeleteAllWebSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/proto.AuthService/DeleteAllWebSessions",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).DeleteAllWebSessions(ctx, req.(*empty.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AuthService_UpdateRemoteCluster_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(services.RemoteClusterV3)
 	if err := dec(in); err != nil {
@@ -4700,6 +5024,22 @@ var _AuthService_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteAllAppSessions",
 			Handler:    _AuthService_DeleteAllAppSessions_Handler,
+		},
+		{
+			MethodName: "GetWebSession",
+			Handler:    _AuthService_GetWebSession_Handler,
+		},
+		{
+			MethodName: "GetWebSessions",
+			Handler:    _AuthService_GetWebSessions_Handler,
+		},
+		{
+			MethodName: "DeleteWebSession",
+			Handler:    _AuthService_DeleteWebSession_Handler,
+		},
+		{
+			MethodName: "DeleteAllWebSessions",
+			Handler:    _AuthService_DeleteAllWebSessions_Handler,
 		},
 		{
 			MethodName: "UpdateRemoteCluster",
@@ -6292,6 +6632,124 @@ func (m *DeleteAppSessionRequest) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
+func (m *GetWebSessionRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GetWebSessionRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.SessionID) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintAuthservice(dAtA, i, uint64(len(m.SessionID)))
+		i += copy(dAtA[i:], m.SessionID)
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *GetWebSessionResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GetWebSessionResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Session != nil {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintAuthservice(dAtA, i, uint64(m.Session.Size()))
+		n29, err := m.Session.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n29
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *GetWebSessionsResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GetWebSessionsResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Sessions) > 0 {
+		for _, msg := range m.Sessions {
+			dAtA[i] = 0xa
+			i++
+			i = encodeVarintAuthservice(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *DeleteWebSessionRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeleteWebSessionRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.SessionID) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintAuthservice(dAtA, i, uint64(len(m.SessionID)))
+		i += copy(dAtA[i:], m.SessionID)
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
 func (m *GetKubeServicesRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -6365,11 +6823,11 @@ func (m *UpsertKubeServiceRequest) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintAuthservice(dAtA, i, uint64(m.Server.Size()))
-		n29, err := m.Server.MarshalTo(dAtA[i:])
+		n30, err := m.Server.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n29
+		i += n30
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(dAtA[i:], m.XXX_unrecognized)
@@ -7194,6 +7652,60 @@ func (m *CreateAppSessionResponse) Size() (n int) {
 }
 
 func (m *DeleteAppSessionRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.SessionID)
+	if l > 0 {
+		n += 1 + l + sovAuthservice(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *GetWebSessionRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.SessionID)
+	if l > 0 {
+		n += 1 + l + sovAuthservice(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *GetWebSessionResponse) Size() (n int) {
+	var l int
+	_ = l
+	if m.Session != nil {
+		l = m.Session.Size()
+		n += 1 + l + sovAuthservice(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *GetWebSessionsResponse) Size() (n int) {
+	var l int
+	_ = l
+	if len(m.Sessions) > 0 {
+		for _, e := range m.Sessions {
+			l = e.Size()
+			n += 1 + l + sovAuthservice(uint64(l))
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *DeleteWebSessionRequest) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.SessionID)
@@ -11577,6 +12089,332 @@ func (m *DeleteAppSessionRequest) Unmarshal(dAtA []byte) error {
 		}
 		if fieldNum <= 0 {
 			return fmt.Errorf("proto: DeleteAppSessionRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SessionID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAuthservice
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAuthservice
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SessionID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipAuthservice(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthAuthservice
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GetWebSessionRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowAuthservice
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GetWebSessionRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GetWebSessionRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SessionID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAuthservice
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAuthservice
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SessionID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipAuthservice(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthAuthservice
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GetWebSessionResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowAuthservice
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GetWebSessionResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GetWebSessionResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Session", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAuthservice
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthAuthservice
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Session == nil {
+				m.Session = &services.WebSessionV2{}
+			}
+			if err := m.Session.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipAuthservice(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthAuthservice
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GetWebSessionsResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowAuthservice
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GetWebSessionsResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GetWebSessionsResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Sessions", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAuthservice
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthAuthservice
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Sessions = append(m.Sessions, &services.WebSessionV2{})
+			if err := m.Sessions[len(m.Sessions)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipAuthservice(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthAuthservice
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DeleteWebSessionRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowAuthservice
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DeleteWebSessionRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DeleteWebSessionRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
