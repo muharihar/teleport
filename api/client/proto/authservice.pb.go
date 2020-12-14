@@ -696,10 +696,12 @@ type WatchKind struct {
 	Name string `protobuf:"bytes,3,opt,name=Name,proto3" json:"name"`
 	// Filter is an optional mapping of custom filter parameters.
 	// Valid values vary by resource kind.
-	Filter               map[string]string `protobuf:"bytes,4,rep,name=Filter" json:"filter,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
-	XXX_unrecognized     []byte            `json:"-"`
-	XXX_sizecache        int32             `json:"-"`
+	Filter map[string]string `protobuf:"bytes,4,rep,name=Filter" json:"filter,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	// SubKind is a resource subkind to watch
+	SubKind              string   `protobuf:"bytes,5,opt,name=SubKind,proto3" json:"sub_kind"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
 func (m *WatchKind) Reset()         { *m = WatchKind{} }
@@ -761,6 +763,13 @@ func (m *WatchKind) GetFilter() map[string]string {
 		return m.Filter
 	}
 	return nil
+}
+
+func (m *WatchKind) GetSubKind() string {
+	if m != nil {
+		return m.SubKind
+	}
+	return ""
 }
 
 // Set of certificates corresponding to a single public key.
@@ -2848,7 +2857,7 @@ func (m *GetWebSessionRequest) Reset()         { *m = GetWebSessionRequest{} }
 func (m *GetWebSessionRequest) String() string { return proto.CompactTextString(m) }
 func (*GetWebSessionRequest) ProtoMessage()    {}
 func (*GetWebSessionRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_authservice_743af4c799734362, []int{37}
+	return fileDescriptor_authservice_4eb53a79310d8ca5, []int{37}
 }
 func (m *GetWebSessionRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2897,7 +2906,7 @@ func (m *GetWebSessionResponse) Reset()         { *m = GetWebSessionResponse{} }
 func (m *GetWebSessionResponse) String() string { return proto.CompactTextString(m) }
 func (*GetWebSessionResponse) ProtoMessage()    {}
 func (*GetWebSessionResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_authservice_743af4c799734362, []int{38}
+	return fileDescriptor_authservice_4eb53a79310d8ca5, []int{38}
 }
 func (m *GetWebSessionResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2946,7 +2955,7 @@ func (m *GetWebSessionsResponse) Reset()         { *m = GetWebSessionsResponse{}
 func (m *GetWebSessionsResponse) String() string { return proto.CompactTextString(m) }
 func (*GetWebSessionsResponse) ProtoMessage()    {}
 func (*GetWebSessionsResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_authservice_743af4c799734362, []int{39}
+	return fileDescriptor_authservice_4eb53a79310d8ca5, []int{39}
 }
 func (m *GetWebSessionsResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2995,7 +3004,7 @@ func (m *DeleteWebSessionRequest) Reset()         { *m = DeleteWebSessionRequest
 func (m *DeleteWebSessionRequest) String() string { return proto.CompactTextString(m) }
 func (*DeleteWebSessionRequest) ProtoMessage()    {}
 func (*DeleteWebSessionRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_authservice_743af4c799734362, []int{40}
+	return fileDescriptor_authservice_4eb53a79310d8ca5, []int{40}
 }
 func (m *DeleteWebSessionRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -5420,6 +5429,12 @@ func (m *WatchKind) MarshalTo(dAtA []byte) (int, error) {
 			i += copy(dAtA[i:], v)
 		}
 	}
+	if len(m.SubKind) > 0 {
+		dAtA[i] = 0x2a
+		i++
+		i = encodeVarintAuthservice(dAtA, i, uint64(len(m.SubKind)))
+		i += copy(dAtA[i:], m.SubKind)
+	}
 	if m.XXX_unrecognized != nil {
 		i += copy(dAtA[i:], m.XXX_unrecognized)
 	}
@@ -7079,6 +7094,10 @@ func (m *WatchKind) Size() (n int) {
 			n += mapEntrySize + 1 + sovAuthservice(uint64(mapEntrySize))
 		}
 	}
+	l = len(m.SubKind)
+	if l > 0 {
+		n += 1 + l + sovAuthservice(uint64(l))
+	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
 	}
@@ -8646,6 +8665,35 @@ func (m *WatchKind) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Filter[mapkey] = mapvalue
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SubKind", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAuthservice
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAuthservice
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SubKind = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

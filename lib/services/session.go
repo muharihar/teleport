@@ -570,7 +570,7 @@ type GetWebSessionRequest struct {
 // Check validates the request.
 func (r *GetWebSessionRequest) Check() error {
 	if r.SessionID == "" {
-		return trace.BadParameter("get web session: session ID missing")
+		return trace.BadParameter("session ID missing")
 	}
 	return nil
 }
