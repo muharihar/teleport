@@ -364,7 +364,7 @@ func NewHandler(cfg Config, opts ...HandlerOption) (*RewritingHandler, error) {
 
 			ctx, err := h.AuthenticateRequest(w, r, false)
 			if err == nil {
-				re, err := NewSessionResponse(ctx)
+				re, err := NewSessionResponse(ctx, ctx.GetWebSession())
 				if err == nil {
 					out, err := json.Marshal(re)
 					if err == nil {
@@ -373,6 +373,8 @@ func NewHandler(cfg Config, opts ...HandlerOption) (*RewritingHandler, error) {
 				} else {
 					h.log.WithError(err).Debug("Could not authenticate.")
 				}
+			} else {
+				h.log.WithError(err).Debug("Could not authenticate.")
 			}
 			httplib.SetIndexHTMLHeaders(w.Header())
 			if err := indexPage.Execute(w, session); err != nil {
@@ -1164,12 +1166,11 @@ type CreateSessionResponse struct {
 	ExpiresIn int `json:"expires_in"`
 }
 
-func NewSessionResponse(ctx *SessionContext) (*CreateSessionResponse, error) {
+func NewSessionResponse(ctx *SessionContext, webSession services.WebSession) (*CreateSessionResponse, error) {
 	clt, err := ctx.GetClient()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	webSession := ctx.GetWebSession()
 	user, err := clt.GetUser(webSession.GetUser(), false)
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -1233,6 +1234,14 @@ func (h *Handler) createWebSession(w http.ResponseWriter, r *http.Request, p htt
 		return nil, trace.AccessDenied("bad auth credentials")
 	}
 
+	// Block and wait a few seconds for the session that was created to show up
+	// in the cache. If this request is not blocked here, it can get stuck in a
+	// racy session creation loop.
+	err = h.waitForWebSession(r.Context(), webSession.GetName())
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
 	if err := SetSession(w, req.User, webSession.GetName()); err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -1243,7 +1252,7 @@ func (h *Handler) createWebSession(w http.ResponseWriter, r *http.Request, p htt
 		return nil, trace.AccessDenied("need auth")
 	}
 
-	return NewSessionResponse(ctx)
+	return NewSessionResponse(ctx, webSession)
 }
 
 // deleteSession is called to sign out user
@@ -1273,11 +1282,8 @@ func (h *Handler) logout(w http.ResponseWriter, ctx *SessionContext) error {
 }
 
 // renewSession is called in two ways:
-// 	- Without requestId: Creates new session that is about to expire.
-// 	- With requestId: Creates new session that includes additional roles assigned with approving access request.
-//
-// 	It issues the new session and generates new session cookie.
-// 	It's important to understand that the old session becomes effectively invalid.
+// 	- Without requestId: Updates the existing session about to expire.
+// 	- With requestId: Updates existing session with additional roles assigned with approving access request.
 func (h *Handler) renewSession(w http.ResponseWriter, r *http.Request, params httprouter.Params, ctx *SessionContext) (interface{}, error) {
 	requestID := params.ByName("requestId")
 
@@ -1289,11 +1295,10 @@ func (h *Handler) renewSession(w http.ResponseWriter, r *http.Request, params ht
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	ctx.parent.updateContext(newSess.GetUser(), newSess.GetName(), newContext)
 	if err := SetSession(w, newSess.GetUser(), newSess.GetName()); err != nil {
 		return nil, trace.Wrap(err)
 	}
-	return NewSessionResponse(newContext)
+	return NewSessionResponse(newContext, newSess)
 }
 
 func (h *Handler) changePasswordWithToken(w http.ResponseWriter, r *http.Request, p httprouter.Params) (interface{}, error) {
@@ -1314,7 +1319,7 @@ func (h *Handler) changePasswordWithToken(w http.ResponseWriter, r *http.Request
 		return nil, trace.Wrap(err)
 	}
 
-	return NewSessionResponse(ctx)
+	return NewSessionResponse(ctx, sess)
 }
 
 // createResetPasswordToken allows a UI user to reset a user's password.
@@ -1455,7 +1460,7 @@ func (h *Handler) createSessionWithU2FSignResponse(w http.ResponseWriter, r *htt
 	if err != nil {
 		return nil, trace.AccessDenied("need auth")
 	}
-	return NewSessionResponse(ctx)
+	return NewSessionResponse(ctx, sess)
 }
 
 // getClusters returns a list of cluster and its data.
