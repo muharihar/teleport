@@ -88,6 +88,7 @@ type Event struct {
 	//	*Event_AccessRequest
 	//	*Event_AppSession
 	//	*Event_RemoteCluster
+	//	*Event_WebSession
 	Resource             isEvent_Resource `protobuf_oneof:"Resource"`
 	XXX_NoUnkeyedLiteral struct{}         `json:"-"`
 	XXX_unrecognized     []byte           `json:"-"`
@@ -178,6 +179,9 @@ type Event_AppSession struct {
 type Event_RemoteCluster struct {
 	RemoteCluster *services.RemoteClusterV3 `protobuf:"bytes,16,opt,name=RemoteCluster,oneof"`
 }
+type Event_WebSession struct {
+	WebSession *services.WebSessionV2 `protobuf:"bytes,17,opt,name=WebSession,oneof"`
+}
 
 func (*Event_ResourceHeader) isEvent_Resource()   {}
 func (*Event_CertAuthority) isEvent_Resource()    {}
@@ -194,6 +198,7 @@ func (*Event_TunnelConnection) isEvent_Resource() {}
 func (*Event_AccessRequest) isEvent_Resource()    {}
 func (*Event_AppSession) isEvent_Resource()       {}
 func (*Event_RemoteCluster) isEvent_Resource()    {}
+func (*Event_WebSession) isEvent_Resource()       {}
 
 func (m *Event) GetResource() isEvent_Resource {
 	if m != nil {
@@ -314,6 +319,13 @@ func (m *Event) GetRemoteCluster() *services.RemoteClusterV3 {
 	return nil
 }
 
+func (m *Event) GetWebSession() *services.WebSessionV2 {
+	if x, ok := m.GetResource().(*Event_WebSession); ok {
+		return x.WebSession
+	}
+	return nil
+}
+
 // XXX_OneofFuncs is for the internal use of the proto package.
 func (*Event) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
 	return _Event_OneofMarshaler, _Event_OneofUnmarshaler, _Event_OneofSizer, []interface{}{
@@ -332,6 +344,7 @@ func (*Event) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, 
 		(*Event_AccessRequest)(nil),
 		(*Event_AppSession)(nil),
 		(*Event_RemoteCluster)(nil),
+		(*Event_WebSession)(nil),
 	}
 }
 
@@ -412,6 +425,11 @@ func _Event_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
 	case *Event_RemoteCluster:
 		_ = b.EncodeVarint(16<<3 | proto.WireBytes)
 		if err := b.EncodeMessage(x.RemoteCluster); err != nil {
+			return err
+		}
+	case *Event_WebSession:
+		_ = b.EncodeVarint(17<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.WebSession); err != nil {
 			return err
 		}
 	case nil:
@@ -544,6 +562,14 @@ func _Event_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) 
 		err := b.DecodeMessage(msg)
 		m.Resource = &Event_RemoteCluster{msg}
 		return true, err
+	case 17: // Resource.WebSession
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(services.WebSessionV2)
+		err := b.DecodeMessage(msg)
+		m.Resource = &Event_WebSession{msg}
+		return true, err
 	default:
 		return false, nil
 	}
@@ -625,6 +651,11 @@ func _Event_OneofSizer(msg proto.Message) (n int) {
 		n += s
 	case *Event_RemoteCluster:
 		s := proto.Size(x.RemoteCluster)
+		n += 2 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *Event_WebSession:
+		s := proto.Size(x.WebSession)
 		n += 2 // tag and wire
 		n += proto.SizeVarint(uint64(s))
 		n += s
@@ -2857,7 +2888,7 @@ func (m *GetWebSessionRequest) Reset()         { *m = GetWebSessionRequest{} }
 func (m *GetWebSessionRequest) String() string { return proto.CompactTextString(m) }
 func (*GetWebSessionRequest) ProtoMessage()    {}
 func (*GetWebSessionRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_authservice_4eb53a79310d8ca5, []int{37}
+	return fileDescriptor_authservice_f4a87df6d743b420, []int{37}
 }
 func (m *GetWebSessionRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2906,7 +2937,7 @@ func (m *GetWebSessionResponse) Reset()         { *m = GetWebSessionResponse{} }
 func (m *GetWebSessionResponse) String() string { return proto.CompactTextString(m) }
 func (*GetWebSessionResponse) ProtoMessage()    {}
 func (*GetWebSessionResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_authservice_4eb53a79310d8ca5, []int{38}
+	return fileDescriptor_authservice_f4a87df6d743b420, []int{38}
 }
 func (m *GetWebSessionResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2955,7 +2986,7 @@ func (m *GetWebSessionsResponse) Reset()         { *m = GetWebSessionsResponse{}
 func (m *GetWebSessionsResponse) String() string { return proto.CompactTextString(m) }
 func (*GetWebSessionsResponse) ProtoMessage()    {}
 func (*GetWebSessionsResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_authservice_4eb53a79310d8ca5, []int{39}
+	return fileDescriptor_authservice_f4a87df6d743b420, []int{39}
 }
 func (m *GetWebSessionsResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -3004,7 +3035,7 @@ func (m *DeleteWebSessionRequest) Reset()         { *m = DeleteWebSessionRequest
 func (m *DeleteWebSessionRequest) String() string { return proto.CompactTextString(m) }
 func (*DeleteWebSessionRequest) ProtoMessage()    {}
 func (*DeleteWebSessionRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_authservice_4eb53a79310d8ca5, []int{40}
+	return fileDescriptor_authservice_f4a87df6d743b420, []int{40}
 }
 func (m *DeleteWebSessionRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -5342,6 +5373,22 @@ func (m *Event_RemoteCluster) MarshalTo(dAtA []byte) (int, error) {
 	}
 	return i, nil
 }
+func (m *Event_WebSession) MarshalTo(dAtA []byte) (int, error) {
+	i := 0
+	if m.WebSession != nil {
+		dAtA[i] = 0x8a
+		i++
+		dAtA[i] = 0x1
+		i++
+		i = encodeVarintAuthservice(dAtA, i, uint64(m.WebSession.Size()))
+		n17, err := m.WebSession.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n17
+	}
+	return i, nil
+}
 func (m *Watch) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -5504,11 +5551,11 @@ func (m *UserCertsRequest) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0x1a
 	i++
 	i = encodeVarintAuthservice(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.Expires)))
-	n17, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.Expires, dAtA[i:])
+	n18, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.Expires, dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n17
+	i += n18
 	if len(m.Format) > 0 {
 		dAtA[i] = 0x22
 		i++
@@ -5723,11 +5770,11 @@ func (m *RequestStateSetter) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0x2a
 	i++
 	i = encodeVarintAuthservice(dAtA, i, uint64(m.Annotations.Size()))
-	n18, err := m.Annotations.MarshalTo(dAtA[i:])
+	n19, err := m.Annotations.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n18
+	i += n19
 	if len(m.Roles) > 0 {
 		for _, s := range m.Roles {
 			dAtA[i] = 0x32
@@ -5998,11 +6045,11 @@ func (m *AuditStreamRequest) MarshalTo(dAtA []byte) (int, error) {
 	var l int
 	_ = l
 	if m.Request != nil {
-		nn19, err := m.Request.MarshalTo(dAtA[i:])
+		nn20, err := m.Request.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += nn19
+		i += nn20
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(dAtA[i:], m.XXX_unrecognized)
@@ -6016,11 +6063,11 @@ func (m *AuditStreamRequest_CreateStream) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintAuthservice(dAtA, i, uint64(m.CreateStream.Size()))
-		n20, err := m.CreateStream.MarshalTo(dAtA[i:])
+		n21, err := m.CreateStream.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n20
+		i += n21
 	}
 	return i, nil
 }
@@ -6030,11 +6077,11 @@ func (m *AuditStreamRequest_ResumeStream) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintAuthservice(dAtA, i, uint64(m.ResumeStream.Size()))
-		n21, err := m.ResumeStream.MarshalTo(dAtA[i:])
+		n22, err := m.ResumeStream.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n21
+		i += n22
 	}
 	return i, nil
 }
@@ -6044,11 +6091,11 @@ func (m *AuditStreamRequest_CompleteStream) MarshalTo(dAtA []byte) (int, error) 
 		dAtA[i] = 0x1a
 		i++
 		i = encodeVarintAuthservice(dAtA, i, uint64(m.CompleteStream.Size()))
-		n22, err := m.CompleteStream.MarshalTo(dAtA[i:])
+		n23, err := m.CompleteStream.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n22
+		i += n23
 	}
 	return i, nil
 }
@@ -6058,11 +6105,11 @@ func (m *AuditStreamRequest_FlushAndCloseStream) MarshalTo(dAtA []byte) (int, er
 		dAtA[i] = 0x22
 		i++
 		i = encodeVarintAuthservice(dAtA, i, uint64(m.FlushAndCloseStream.Size()))
-		n23, err := m.FlushAndCloseStream.MarshalTo(dAtA[i:])
+		n24, err := m.FlushAndCloseStream.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n23
+		i += n24
 	}
 	return i, nil
 }
@@ -6072,11 +6119,11 @@ func (m *AuditStreamRequest_Event) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x2a
 		i++
 		i = encodeVarintAuthservice(dAtA, i, uint64(m.Event.Size()))
-		n24, err := m.Event.MarshalTo(dAtA[i:])
+		n25, err := m.Event.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n24
+		i += n25
 	}
 	return i, nil
 }
@@ -6298,11 +6345,11 @@ func (m *UpsertAppServerRequest) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintAuthservice(dAtA, i, uint64(m.Server.Size()))
-		n25, err := m.Server.MarshalTo(dAtA[i:])
+		n26, err := m.Server.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n25
+		i += n26
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(dAtA[i:], m.XXX_unrecognized)
@@ -6415,11 +6462,11 @@ func (m *GenerateAppTokenRequest) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0x22
 	i++
 	i = encodeVarintAuthservice(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.Expires)))
-	n26, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.Expires, dAtA[i:])
+	n27, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.Expires, dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n26
+	i += n27
 	if m.XXX_unrecognized != nil {
 		i += copy(dAtA[i:], m.XXX_unrecognized)
 	}
@@ -6499,11 +6546,11 @@ func (m *GetAppSessionResponse) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintAuthservice(dAtA, i, uint64(m.Session.Size()))
-		n27, err := m.Session.MarshalTo(dAtA[i:])
+		n28, err := m.Session.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n27
+		i += n28
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(dAtA[i:], m.XXX_unrecognized)
@@ -6608,11 +6655,11 @@ func (m *CreateAppSessionResponse) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintAuthservice(dAtA, i, uint64(m.Session.Size()))
-		n28, err := m.Session.MarshalTo(dAtA[i:])
+		n29, err := m.Session.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n28
+		i += n29
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(dAtA[i:], m.XXX_unrecognized)
@@ -6693,11 +6740,11 @@ func (m *GetWebSessionResponse) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintAuthservice(dAtA, i, uint64(m.Session.Size()))
-		n29, err := m.Session.MarshalTo(dAtA[i:])
+		n30, err := m.Session.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n29
+		i += n30
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(dAtA[i:], m.XXX_unrecognized)
@@ -6838,11 +6885,11 @@ func (m *UpsertKubeServiceRequest) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintAuthservice(dAtA, i, uint64(m.Server.Size()))
-		n30, err := m.Server.MarshalTo(dAtA[i:])
+		n31, err := m.Server.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n30
+		i += n31
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(dAtA[i:], m.XXX_unrecognized)
@@ -7053,6 +7100,15 @@ func (m *Event_RemoteCluster) Size() (n int) {
 	_ = l
 	if m.RemoteCluster != nil {
 		l = m.RemoteCluster.Size()
+		n += 2 + l + sovAuthservice(uint64(l))
+	}
+	return n
+}
+func (m *Event_WebSession) Size() (n int) {
+	var l int
+	_ = l
+	if m.WebSession != nil {
+		l = m.WebSession.Size()
 		n += 2 + l + sovAuthservice(uint64(l))
 	}
 	return n
@@ -8336,6 +8392,38 @@ func (m *Event) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			m.Resource = &Event_RemoteCluster{v}
+			iNdEx = postIndex
+		case 17:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field WebSession", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAuthservice
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthAuthservice
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &services.WebSessionV2{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.Resource = &Event_WebSession{v}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

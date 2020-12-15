@@ -204,6 +204,9 @@ const (
 	V1 = "v1"
 )
 
+// WebSessionSubKinds lists subkinds of web session resources
+var WebSessionSubKinds = []string{KindAppSession, KindWebSession}
+
 const (
 	// VerbList is used to list all objects. Does not imply the ability to read a single object.
 	VerbList = "list"
