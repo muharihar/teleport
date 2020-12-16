@@ -1077,7 +1077,7 @@ func showApps(servers []services.Server, verbose bool) {
 
 func showDatabases(servers []services.DatabaseServer, active []tlsca.RouteToDatabase, verbose bool) {
 	if verbose {
-		t := asciitable.MakeTable([]string{"Name", "Description", "URI", "Labels"})
+		t := asciitable.MakeTable([]string{"Name", "Description", "Protocol", "URI", "Labels"})
 		for _, server := range servers {
 			name := server.GetName()
 			for _, a := range active {
@@ -1088,6 +1088,7 @@ func showDatabases(servers []services.DatabaseServer, active []tlsca.RouteToData
 			t.AddRow([]string{
 				name,
 				server.GetDescription(),
+				server.GetProtocol(),
 				server.GetURI(),
 				server.LabelsString(),
 			})

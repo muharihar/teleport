@@ -41,7 +41,7 @@ type Proxy struct {
 	// Middleware is the auth middleware.
 	Middleware *auth.Middleware
 	// ConnectToSite is used to connect to remote database server over reverse tunnel.
-	ConnectToSite func(context.Context) (net.Conn, error)
+	ConnectToSite func(context.Context, string, string) (net.Conn, error)
 	// Log is used for logging.
 	Log logrus.FieldLogger
 }
@@ -64,7 +64,7 @@ func (p *Proxy) HandleConnection(ctx context.Context, clientConn net.Conn) (err 
 	if err != nil {
 		return trace.Wrap(err)
 	}
-	siteConn, err := p.ConnectToSite(ctx)
+	siteConn, err := p.ConnectToSite(ctx, "", "")
 	if err != nil {
 		return trace.Wrap(err)
 	}

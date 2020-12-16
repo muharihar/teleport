@@ -30,6 +30,7 @@ import (
 	"github.com/gravitational/teleport/lib/multiplexer"
 	"github.com/gravitational/teleport/lib/reversetunnel"
 	"github.com/gravitational/teleport/lib/services"
+	"github.com/gravitational/teleport/lib/srv/db/mysql"
 	"github.com/gravitational/teleport/lib/srv/db/postgres"
 	"github.com/gravitational/teleport/lib/tlsca"
 	"github.com/gravitational/teleport/lib/utils"
@@ -129,7 +130,8 @@ func (s *ProxyServer) Serve(listener net.Listener) error {
 			defer clientConn.Close()
 			err := proxy.HandleConnection(s.closeCtx, clientConn)
 			if err != nil {
-				s.log.WithError(err).Error("Failed to handle client connection.")
+				s.log.Errorf("Failed to handle client connection: %v.",
+					trace.DebugReport(err))
 			}
 		}()
 	}
@@ -157,6 +159,14 @@ func (s *ProxyServer) dispatch(clientConn net.Conn) (DatabaseProxy, error) {
 			ConnectToSite: s.connectToSite,
 			Log:           s.log,
 		}, nil
+	case multiplexer.ProtoMySQL:
+		s.log.Debugf("Accepted MySQL connection from %v.", muxConn.RemoteAddr())
+		return &mysql.Proxy{
+			TLSConfig:     s.cfg.TLSConfig,
+			Middleware:    s.middleware,
+			ConnectToSite: s.connectToSite,
+			Log:           s.log,
+		}, nil
 	}
 	return nil, trace.BadParameter("unsupported database protocol %q",
 		muxConn.Protocol())
@@ -168,8 +178,8 @@ func (s *ProxyServer) dispatch(clientConn net.Conn) (DatabaseProxy, error) {
 //
 // The passed in context is expected to contain the identity information
 // decoded from the client certificate by auth.Middleware.
-func (s *ProxyServer) connectToSite(ctx context.Context) (net.Conn, error) {
-	authContext, err := s.authorize(ctx)
+func (s *ProxyServer) connectToSite(ctx context.Context, user, database string) (net.Conn, error) {
+	authContext, err := s.authorize(ctx, user, database)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -203,12 +213,14 @@ type proxyContext struct {
 	server services.DatabaseServer
 }
 
-func (s *ProxyServer) authorize(ctx context.Context) (*proxyContext, error) {
+func (s *ProxyServer) authorize(ctx context.Context, user, database string) (*proxyContext, error) {
 	authContext, err := s.cfg.Authorizer.Authorize(ctx)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 	identity := authContext.Identity.GetIdentity()
+	identity.RouteToDatabase.Username = user
+	identity.RouteToDatabase.Database = database
 	s.log.Debugf("Client identity: %#v.", identity)
 	site, server, err := s.pickDatabaseServer(ctx, identity)
 	if err != nil {

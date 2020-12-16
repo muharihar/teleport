@@ -29,6 +29,7 @@ import (
 	"github.com/gravitational/teleport/lib/labels"
 	"github.com/gravitational/teleport/lib/services"
 	"github.com/gravitational/teleport/lib/srv"
+	"github.com/gravitational/teleport/lib/srv/db/mysql"
 	"github.com/gravitational/teleport/lib/srv/db/postgres"
 	"github.com/gravitational/teleport/lib/srv/db/session"
 	"github.com/gravitational/teleport/lib/utils"
@@ -378,6 +379,17 @@ func (s *Server) dispatch(sessionCtx *session.Context, streamWriter events.Strea
 			Clock:          s.cfg.Clock,
 			Log:            sessionCtx.Log,
 		}, nil
+	case defaults.ProtocolMySQL:
+		return &mysql.Engine{
+			AuthClient:     s.cfg.AuthClient,
+			Credentials:    s.cfg.Credentials,
+			RDSCACerts:     s.rdsCACerts,
+			OnSessionStart: s.emitSessionStartEventFn(streamWriter),
+			OnSessionEnd:   s.emitSessionEndEventFn(streamWriter),
+			OnQuery:        s.emitQueryEventFn(streamWriter),
+			Clock:          s.cfg.Clock,
+			Log:            sessionCtx.Log,
+		}, nil
 	}
 	return nil, trace.BadParameter("unsupported database protocol %q",
 		sessionCtx.Server.GetProtocol())
@@ -412,6 +424,8 @@ func (s *Server) authorize(ctx context.Context) (*session.Context, error) {
 		ID:                id,
 		Server:            server,
 		Identity:          identity,
+		DatabaseUser:      identity.RouteToDatabase.Username,
+		DatabaseName:      identity.RouteToDatabase.Database,
 		Checker:           authContext.Checker,
 		StartupParameters: make(map[string]string),
 		Log: s.log.WithFields(logrus.Fields{
