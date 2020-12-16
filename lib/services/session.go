@@ -563,12 +563,17 @@ type DeleteAppSessionRequest struct {
 // GetWebSessionRequest contains the parameters to request a regular
 // web session.
 type GetWebSessionRequest struct {
+	// User specifies the user to query the session for
+	User string
 	// SessionID is the session ID to request
 	SessionID string
 }
 
 // Check validates the request.
 func (r *GetWebSessionRequest) Check() error {
+	if r.User == "" {
+		return trace.BadParameter("user name missing")
+	}
 	if r.SessionID == "" {
 		return trace.BadParameter("session ID missing")
 	}
@@ -585,7 +590,7 @@ type DeleteWebSessionRequest struct {
 // Check validates the request.
 func (r *DeleteWebSessionRequest) Check() error {
 	if r.SessionID == "" {
-		return trace.BadParameter("delete web session: session ID missing")
+		return trace.BadParameter("session ID missing")
 	}
 	return nil
 }

@@ -99,7 +99,7 @@ func (m *Event) Reset()         { *m = Event{} }
 func (m *Event) String() string { return proto.CompactTextString(m) }
 func (*Event) ProtoMessage()    {}
 func (*Event) Descriptor() ([]byte, []int) {
-	return fileDescriptor_authservice_cb74ba7fbf9b8c1a, []int{0}
+	return fileDescriptor_authservice_f4a87df6d743b420, []int{0}
 }
 func (m *Event) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2877,8 +2877,10 @@ func (m *DeleteAppSessionRequest) GetSessionID() string {
 
 // GetWebSessionRequest are the parameters used to request a regular web session.
 type GetWebSessionRequest struct {
+	// User is the user name to request session for.
+	User string `protobuf:"bytes,1,opt,name=User,proto3" json:"user"`
 	// SessionID is the ID of the session being requested.
-	SessionID            string   `protobuf:"bytes,1,opt,name=SessionID,proto3" json:"session_id"`
+	SessionID            string   `protobuf:"bytes,2,opt,name=SessionID,proto3" json:"session_id"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -2888,7 +2890,7 @@ func (m *GetWebSessionRequest) Reset()         { *m = GetWebSessionRequest{} }
 func (m *GetWebSessionRequest) String() string { return proto.CompactTextString(m) }
 func (*GetWebSessionRequest) ProtoMessage()    {}
 func (*GetWebSessionRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_authservice_f4a87df6d743b420, []int{37}
+	return fileDescriptor_authservice_806dd281d23ca00b, []int{37}
 }
 func (m *GetWebSessionRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2917,6 +2919,13 @@ func (m *GetWebSessionRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_GetWebSessionRequest proto.InternalMessageInfo
 
+func (m *GetWebSessionRequest) GetUser() string {
+	if m != nil {
+		return m.User
+	}
+	return ""
+}
+
 func (m *GetWebSessionRequest) GetSessionID() string {
 	if m != nil {
 		return m.SessionID
@@ -2937,7 +2946,7 @@ func (m *GetWebSessionResponse) Reset()         { *m = GetWebSessionResponse{} }
 func (m *GetWebSessionResponse) String() string { return proto.CompactTextString(m) }
 func (*GetWebSessionResponse) ProtoMessage()    {}
 func (*GetWebSessionResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_authservice_f4a87df6d743b420, []int{38}
+	return fileDescriptor_authservice_806dd281d23ca00b, []int{38}
 }
 func (m *GetWebSessionResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2986,7 +2995,7 @@ func (m *GetWebSessionsResponse) Reset()         { *m = GetWebSessionsResponse{}
 func (m *GetWebSessionsResponse) String() string { return proto.CompactTextString(m) }
 func (*GetWebSessionsResponse) ProtoMessage()    {}
 func (*GetWebSessionsResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_authservice_f4a87df6d743b420, []int{39}
+	return fileDescriptor_authservice_806dd281d23ca00b, []int{39}
 }
 func (m *GetWebSessionsResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -3035,7 +3044,7 @@ func (m *DeleteWebSessionRequest) Reset()         { *m = DeleteWebSessionRequest
 func (m *DeleteWebSessionRequest) String() string { return proto.CompactTextString(m) }
 func (*DeleteWebSessionRequest) ProtoMessage()    {}
 func (*DeleteWebSessionRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_authservice_f4a87df6d743b420, []int{40}
+	return fileDescriptor_authservice_806dd281d23ca00b, []int{40}
 }
 func (m *DeleteWebSessionRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -6709,8 +6718,14 @@ func (m *GetWebSessionRequest) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.SessionID) > 0 {
+	if len(m.User) > 0 {
 		dAtA[i] = 0xa
+		i++
+		i = encodeVarintAuthservice(dAtA, i, uint64(len(m.User)))
+		i += copy(dAtA[i:], m.User)
+	}
+	if len(m.SessionID) > 0 {
+		dAtA[i] = 0x12
 		i++
 		i = encodeVarintAuthservice(dAtA, i, uint64(len(m.SessionID)))
 		i += copy(dAtA[i:], m.SessionID)
@@ -7742,6 +7757,10 @@ func (m *DeleteAppSessionRequest) Size() (n int) {
 func (m *GetWebSessionRequest) Size() (n int) {
 	var l int
 	_ = l
+	l = len(m.User)
+	if l > 0 {
+		n += 1 + l + sovAuthservice(uint64(l))
+	}
 	l = len(m.SessionID)
 	if l > 0 {
 		n += 1 + l + sovAuthservice(uint64(l))
@@ -12308,6 +12327,35 @@ func (m *GetWebSessionRequest) Unmarshal(dAtA []byte) error {
 		}
 		switch fieldNum {
 		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field User", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAuthservice
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAuthservice
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.User = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field SessionID", wireType)
 			}
