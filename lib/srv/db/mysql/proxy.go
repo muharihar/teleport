@@ -61,7 +61,7 @@ func (p *credentialProvider) GetCredential(_ string) (string, bool, error) { ret
 func (p *Proxy) HandleConnection(ctx context.Context, clientConn net.Conn) (err error) {
 	conn := server.MakeConn(
 		clientConn,
-		server.NewServer("Teleport-1.2.3", mysql.DEFAULT_COLLATION_ID, mysql.AUTH_NATIVE_PASSWORD, nil, p.TLSConfig),
+		server.NewServer("8.0.0-Teleport", mysql.DEFAULT_COLLATION_ID, mysql.AUTH_NATIVE_PASSWORD, nil, p.TLSConfig),
 		&credentialProvider{},
 		server.EmptyHandler{})
 	err = conn.WriteInitialHandshake()
@@ -85,6 +85,10 @@ func (p *Proxy) HandleConnection(ctx context.Context, clientConn net.Conn) (err 
 		return trace.Wrap(err)
 	}
 	defer siteConn.Close()
+	err = conn.WriteOK(nil)
+	if err != nil {
+		return trace.Wrap(err)
+	}
 	err = p.proxyToSite(ctx, tlsConn, siteConn)
 	if err != nil {
 		return trace.Wrap(err)

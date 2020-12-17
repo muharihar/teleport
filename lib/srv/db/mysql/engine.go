@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"io"
 	"net"
 
 	"github.com/gravitational/teleport/lib/auth"
@@ -32,6 +33,8 @@ import (
 	"github.com/gravitational/teleport/lib/utils"
 
 	"github.com/siddontang/go-mysql/client"
+	"github.com/siddontang/go-mysql/packet"
+	"github.com/siddontang/go-mysql/server"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/rds/rdsutils"
@@ -41,9 +44,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Engine implements the Postgres database service that accepts client
+// Engine implements the MySQL database service that accepts client
 // connections coming over reverse tunnel from the proxy and proxies
-// them between the proxy and the Postgres database instance.
+// them between the proxy and the MySQL database instance.
 //
 // Implements db.DatabaseEngine.
 type Engine struct {
@@ -67,7 +70,7 @@ type Engine struct {
 	Log logrus.FieldLogger
 }
 
-// HandleConnection processes the connection from Postgres proxy coming
+// HandleConnection processes the connection from MySQL proxy coming
 // over reverse tunnel.
 //
 // It handles all necessary startup actions, authorization and acts as a
@@ -78,10 +81,27 @@ func (e *Engine) HandleConnection(ctx context.Context, sessionCtx *session.Conte
 	if err != nil {
 		return trace.Wrap(err)
 	}
-	_, err = e.connect(ctx, sessionCtx)
+	// Make server conn to get access to WriteOK method.
+	proxyConn := server.Conn{
+		Conn: packet.NewConn(clientConn),
+	}
+	// err = proxyConn.WriteOK(nil)
+	// if err != nil {
+	// 	return trace.Wrap(err)
+	// }
+	e.Log.Debug("Wrote OK.")
+	serverConn, err := e.connect(ctx, sessionCtx)
 	if err != nil {
 		return trace.Wrap(err)
 	}
+	e.Log.Debugf("Connected: %#v.", serverConn)
+	// Copy between the connections.
+	go io.Copy(proxyConn.Conn.Conn, serverConn.Conn.Conn)
+	_, err = io.Copy(serverConn.Conn.Conn, proxyConn.Conn.Conn)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	e.Log.Debug("Exit.")
 	return nil
 }
 
@@ -98,7 +118,17 @@ func (e *Engine) checkAccess(sessionCtx *session.Context) error {
 }
 
 func (e *Engine) connect(ctx context.Context, sessionCtx *session.Context) (*client.Conn, error) {
-	conn, err := client.Connect()
+	tlsConfig, err := e.getTLSConfig(ctx, sessionCtx)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	conn, err := client.Connect(sessionCtx.Server.GetURI(),
+		sessionCtx.DatabaseUser,
+		"",
+		sessionCtx.DatabaseName,
+		func(conn *client.Conn) {
+			conn.SetTLSConfig(tlsConfig)
+		})
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
