@@ -21,7 +21,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"io"
 	"net"
 
 	"github.com/gravitational/teleport/lib/auth"
@@ -34,7 +33,6 @@ import (
 
 	"github.com/siddontang/go-mysql/client"
 	"github.com/siddontang/go-mysql/packet"
-	"github.com/siddontang/go-mysql/server"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/rds/rdsutils"
@@ -82,25 +80,58 @@ func (e *Engine) HandleConnection(ctx context.Context, sessionCtx *session.Conte
 		return trace.Wrap(err)
 	}
 	// Make server conn to get access to WriteOK method.
-	proxyConn := server.Conn{
-		Conn: packet.NewConn(clientConn),
-	}
+	clientPacketConn := packet.NewConn(clientConn)
+	// proxyConn := server.Conn{
+	// 	Conn: clientPacketConn,
+	// }
+	//proxyConn.Sequence = 5
 	// err = proxyConn.WriteOK(nil)
 	// if err != nil {
 	// 	return trace.Wrap(err)
 	// }
+	// proxyConn.ResetSequence()
 	e.Log.Debug("Wrote OK.")
 	serverConn, err := e.connect(ctx, sessionCtx)
 	if err != nil {
 		return trace.Wrap(err)
 	}
+	serverConn.ResetSequence()
+	serverPacketConn := serverConn.Conn
 	e.Log.Debugf("Connected: %#v.", serverConn)
 	// Copy between the connections.
-	go io.Copy(proxyConn.Conn.Conn, serverConn.Conn.Conn)
-	_, err = io.Copy(serverConn.Conn.Conn, proxyConn.Conn.Conn)
-	if err != nil {
-		return trace.Wrap(err)
+	go func() {
+		for {
+			e.Log.Debug("Client reading packet.")
+			data, err := clientPacketConn.ReadPacket()
+			if err != nil {
+				e.Log.WithError(err).Error("Failed to read client packet.")
+				return
+			}
+			e.Log.Debug("Client packet: %v", data)
+			err = serverPacketConn.WritePacket(data)
+			if err != nil {
+				e.Log.WithError(err).Error("Failed to write server packet.")
+				return
+			}
+		}
+	}()
+	for {
+		e.Log.Debug("Server reading packet")
+		data, err := serverPacketConn.ReadPacket()
+		if err != nil {
+			return trace.Wrap(err)
+		}
+		e.Log.Debug("Server packet: %v", data)
+		err = clientPacketConn.WritePacket(data)
+		if err != nil {
+			return trace.Wrap(err)
+		}
 	}
+	// go io.Copy(proxyConn.Conn.Conn, serverConn.Conn.Conn)
+	// _, err = io.Copy(serverConn.Conn.Conn, proxyConn.Conn.Conn)
+	// if err != nil {
+	// 	return trace.Wrap(err)
+	// }
 	e.Log.Debug("Exit.")
 	return nil
 }

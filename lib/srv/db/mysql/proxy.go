@@ -85,10 +85,13 @@ func (p *Proxy) HandleConnection(ctx context.Context, clientConn net.Conn) (err 
 		return trace.Wrap(err)
 	}
 	defer siteConn.Close()
+	// Wait for OK packet from db service indicating auth success.
+
 	err = conn.WriteOK(nil)
 	if err != nil {
 		return trace.Wrap(err)
 	}
+	//conn.ResetSequence()
 	err = p.proxyToSite(ctx, tlsConn, siteConn)
 	if err != nil {
 		return trace.Wrap(err)
