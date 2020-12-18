@@ -27,12 +27,15 @@ import (
 	"github.com/gravitational/teleport/lib/auth/native"
 	"github.com/gravitational/teleport/lib/auth/proto"
 	"github.com/gravitational/teleport/lib/events"
+	"github.com/gravitational/teleport/lib/srv/db/mysql/protocol"
 	"github.com/gravitational/teleport/lib/srv/db/session"
 	"github.com/gravitational/teleport/lib/tlsca"
 	"github.com/gravitational/teleport/lib/utils"
 
 	"github.com/siddontang/go-mysql/client"
+	"github.com/siddontang/go-mysql/mysql"
 	"github.com/siddontang/go-mysql/packet"
+	"github.com/siddontang/go-mysql/server"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/rds/rdsutils"
@@ -75,64 +78,60 @@ type Engine struct {
 // middleman between the proxy and the database intercepting and interpreting
 // all messages i.e. doing protocol parsing.
 func (e *Engine) HandleConnection(ctx context.Context, sessionCtx *session.Context, clientConn net.Conn) (err error) {
+	// Make server conn to get access to protocol's WriteOK/WriteError methods.
+	proxyConn := server.Conn{Conn: packet.NewConn(clientConn)}
+	defer func() {
+		if err != nil {
+			if err := proxyConn.WriteError(err); err != nil {
+				e.Log.WithError(err).Error("Failed to send error to client.")
+			}
+		}
+	}()
+	// Perform authorization checks.
 	err = e.checkAccess(sessionCtx)
 	if err != nil {
 		return trace.Wrap(err)
 	}
-	// Make server conn to get access to WriteOK method.
-	clientPacketConn := packet.NewConn(clientConn)
-	// proxyConn := server.Conn{
-	// 	Conn: clientPacketConn,
-	// }
-	//proxyConn.Sequence = 5
-	// err = proxyConn.WriteOK(nil)
-	// if err != nil {
-	// 	return trace.Wrap(err)
-	// }
-	// proxyConn.ResetSequence()
-	e.Log.Debug("Wrote OK.")
+	// Establish connection to the MySQL server.
 	serverConn, err := e.connect(ctx, sessionCtx)
 	if err != nil {
 		return trace.Wrap(err)
 	}
-	serverConn.ResetSequence()
-	serverPacketConn := serverConn.Conn
-	e.Log.Debugf("Connected: %#v.", serverConn)
-	// Copy between the connections.
-	go func() {
-		for {
-			e.Log.Debug("Client reading packet.")
-			data, err := clientPacketConn.ReadPacket()
-			if err != nil {
-				e.Log.WithError(err).Error("Failed to read client packet.")
-				return
-			}
-			e.Log.Debug("Client packet: %v", data)
-			err = serverPacketConn.WritePacket(data)
-			if err != nil {
-				e.Log.WithError(err).Error("Failed to write server packet.")
-				return
-			}
+	defer func() {
+		err := serverConn.Close()
+		if err != nil {
+			e.Log.WithError(err).Error("Failed to close connection to MySQL server.")
 		}
 	}()
-	for {
-		e.Log.Debug("Server reading packet")
-		data, err := serverPacketConn.ReadPacket()
-		if err != nil {
-			return trace.Wrap(err)
-		}
-		e.Log.Debug("Server packet: %v", data)
-		err = clientPacketConn.WritePacket(data)
-		if err != nil {
-			return trace.Wrap(err)
-		}
+	// Send back OK packet to indicate auth/connect success. At this point
+	// the original client should consider the connection phase completed.
+	err = proxyConn.WriteOK(nil)
+	if err != nil {
+		return trace.Wrap(err)
 	}
-	// go io.Copy(proxyConn.Conn.Conn, serverConn.Conn.Conn)
-	// _, err = io.Copy(serverConn.Conn.Conn, proxyConn.Conn.Conn)
-	// if err != nil {
-	// 	return trace.Wrap(err)
-	// }
-	e.Log.Debug("Exit.")
+	err = e.OnSessionStart(*sessionCtx, nil)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	defer func() {
+		err := e.OnSessionEnd(*sessionCtx)
+		if err != nil {
+			e.Log.WithError(err).Error("Failed to emit audit event.")
+		}
+	}()
+	// Copy between the connections.
+	clientErrCh := make(chan error, 1)
+	serverErrCh := make(chan error, 1)
+	go e.receiveFromClient(clientConn, serverConn, clientErrCh, sessionCtx)
+	go e.receiveFromServer(serverConn, clientConn, serverErrCh)
+	select {
+	case err := <-clientErrCh:
+		e.Log.WithError(err).Debug("Client done.")
+	case err := <-serverErrCh:
+		e.Log.WithError(err).Debug("Server done.")
+	case <-ctx.Done():
+		e.Log.Debug("Context canceled.")
+	}
 	return nil
 }
 
@@ -164,6 +163,53 @@ func (e *Engine) connect(ctx context.Context, sessionCtx *session.Context) (*cli
 		return nil, trace.Wrap(err)
 	}
 	return conn, nil
+}
+
+func (e *Engine) receiveFromClient(clientConn, serverConn net.Conn, clientErrCh chan<- error, sessionCtx *session.Context) {
+	log := e.Log.WithField("from", "client")
+	defer log.Debug("Stop receiving from client.")
+	for {
+		packet, err := protocol.ReadPacket(clientConn)
+		if err != nil {
+			log.WithError(err).Error("Failed to read client packet.")
+			clientErrCh <- err
+			return
+		}
+		log.Debugf("Client packet: %s.", packet)
+		switch packet[4] {
+		case mysql.COM_QUERY:
+			err := e.OnQuery(*sessionCtx, string(packet[5:]))
+			if err != nil {
+				log.WithError(err).Error("Failed to emit audit event.")
+			}
+		}
+		_, err = protocol.WritePacket(packet, serverConn)
+		if err != nil {
+			log.WithError(err).Error("Failed to write server packet.")
+			clientErrCh <- err
+			return
+		}
+	}
+}
+
+func (e *Engine) receiveFromServer(serverConn, clientConn net.Conn, serverErrCh chan<- error) {
+	log := e.Log.WithField("from", "server")
+	defer log.Debug("Stop receiving from server.")
+	for {
+		packet, err := protocol.ReadPacket(serverConn)
+		if err != nil {
+			log.WithError(err).Error("Failed to read server packet.")
+			serverErrCh <- err
+			return
+		}
+		log.Debugf("Server packet: %s.", packet)
+		_, err = protocol.WritePacket(packet, clientConn)
+		if err != nil {
+			log.WithError(err).Error("Failed to write client packet.")
+			serverErrCh <- err
+			return
+		}
+	}
 }
 
 // getAWSAuthToken returns authorization token that will be used as a password

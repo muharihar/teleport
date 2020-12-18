@@ -18,10 +18,8 @@ package mysql
 
 import (
 	"context"
-	"crypto/rsa"
 	"crypto/tls"
-	"crypto/x509"
-	"encoding/pem"
+	"errors"
 	"io"
 	"net"
 	"strings"
@@ -51,155 +49,105 @@ type Proxy struct {
 	Log logrus.FieldLogger
 }
 
+// HandleConnection accepts connection from a Postgres client, authenticates
+// it and proxies it to an appropriate database service.
+func (p *Proxy) HandleConnection(ctx context.Context, clientConn net.Conn) (err error) {
+	server := p.makeServer(clientConn)
+	// Perform first part of the handshake, up to the point where client sends
+	// us certificate and connection upgrades to TLS.
+	tlsConn, err := p.performHandshake(server)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	ctx, err = p.Middleware.WrapContext(ctx, tlsConn)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	siteConn, err := p.ConnectToSite(ctx, server.GetUser(), server.GetDatabase())
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	defer siteConn.Close()
+	// Before replying OK to the client which would make the client consider
+	// auth completed, wait for OK packet from db service indicating auth
+	// success.
+	err = p.waitForOK(server, siteConn)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	// Auth has completed, the client enters command phase, start proxying
+	// all messages back-and-forth.
+	err = p.proxyToSite(ctx, tlsConn, siteConn)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	return nil
+}
+
 type credentialProvider struct{}
 
 func (p *credentialProvider) CheckUsername(_ string) (bool, error)         { return true, nil }
 func (p *credentialProvider) GetCredential(_ string) (string, bool, error) { return "", true, nil }
 
-// HandleConnection accepts connection from a Postgres client, authenticates
-// it and proxies it to an appropriate database service.
-func (p *Proxy) HandleConnection(ctx context.Context, clientConn net.Conn) (err error) {
-	conn := server.MakeConn(
+// makeServer creates a MySQL server from the accepted client connection that
+// provides access to various parts of the handshake.
+func (p *Proxy) makeServer(clientConn net.Conn) *server.Conn {
+	// TODO(r0mant): Add CLIENT_NO_SCHEMA and CLIENT_DEPRECATE_EOF server capabilities.
+	return server.MakeConn(
 		clientConn,
-		server.NewServer("8.0.0-Teleport", mysql.DEFAULT_COLLATION_ID, mysql.AUTH_NATIVE_PASSWORD, nil, p.TLSConfig),
+		server.NewServer(
+			serverVersion,
+			mysql.DEFAULT_COLLATION_ID,
+			mysql.AUTH_NATIVE_PASSWORD,
+			nil,
+			p.TLSConfig),
 		&credentialProvider{},
 		server.EmptyHandler{})
-	err = conn.WriteInitialHandshake()
+}
+
+// performHandshake performs the initial handshake between MySQL client and
+// this server, up to the point where the client sends us a certificate for
+// authentication, and returns the upgraded connection.
+func (p *Proxy) performHandshake(server *server.Conn) (*tls.Conn, error) {
+	err := server.WriteInitialHandshake()
 	if err != nil {
-		return trace.Wrap(err)
+		return nil, trace.Wrap(err)
 	}
-	err = conn.ReadHandshakeResponse()
+	err = server.ReadHandshakeResponse()
 	if err != nil {
-		return trace.Wrap(err)
+		return nil, trace.Wrap(err)
 	}
-	tlsConn, ok := conn.Conn.Conn.(*tls.Conn)
+	// First part of the handshake completed and the connection has been
+	// upgraded to TLS so now we can look at the client certificate and
+	// see which database service to route the connection to.
+	tlsConn, ok := server.Conn.Conn.(*tls.Conn)
 	if !ok {
-		return trace.BadParameter("expected tls connection")
+		return nil, trace.BadParameter("expected tls connection")
 	}
-	ctx, err = p.Middleware.WrapContext(ctx, tlsConn)
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	siteConn, err := p.ConnectToSite(ctx, conn.GetUser(), conn.GetDatabase())
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	defer siteConn.Close()
-	// Wait for OK packet from db service indicating auth success.
-
-	err = conn.WriteOK(nil)
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	//conn.ResetSequence()
-	err = p.proxyToSite(ctx, tlsConn, siteConn)
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	return nil
-
-	// err = conn.WriteOK(nil)
-	// if err != nil {
-	// 	return trace.Wrap(err)
-	// }
-	// return nil
+	return tlsConn, nil
 }
 
-func (p *Proxy) getPublicKey() []byte {
-	certPEM := p.TLSConfig.Certificates[0].Certificate[0]
-	block, _ := pem.Decode(certPEM)
-	crt, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		panic(err)
-	}
-	pubKey, err := x509.MarshalPKIXPublicKey(crt.PublicKey.(*rsa.PublicKey))
-	if err != nil {
-		panic(err)
-	}
-	return pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubKey})
-}
-
-// HandleConnection accepts connection from a Postgres client, authenticates
-// it and proxies it to an appropriate database service.
-func (p *Proxy) HandleConnection2(ctx context.Context, clientConn net.Conn) (err error) {
-	_, err = clientConn.Write(protocol.NewHandshakeV10().Encode())
+// waitForOK waits for OK_PACKET from the database service (siteConn)
+// which indicates that auth on the other side completed succesfully.
+func (p *Proxy) waitForOK(server *server.Conn, siteConn net.Conn) error {
+	packet, err := protocol.ReadPacket(siteConn)
 	if err != nil {
 		return trace.Wrap(err)
 	}
-	packet, err := protocol.ReadPacket(clientConn)
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	sslRequest, err := protocol.UnpackSSLRequest(packet)
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	p.Log.Debugf("%#v", sslRequest)
-	// Upgrade connection to TLS.
-	tlsConn := tls.Server(clientConn, p.TLSConfig)
-	err = tlsConn.Handshake()
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	ctx, err = p.Middleware.WrapContext(ctx, tlsConn)
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	siteConn, err := p.ConnectToSite(ctx, "", "")
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	defer siteConn.Close()
-	err = p.proxyToSite(ctx, tlsConn, siteConn)
-	if err != nil {
-		return trace.Wrap(err)
+	p.Log.Debugf("Received packet: %s", packet)
+	switch packet[4] {
+	case mysql.OK_HEADER:
+		err = server.WriteOK(nil)
+		if err != nil {
+			return trace.Wrap(err)
+		}
+	case mysql.ERR_HEADER:
+		err = server.WriteError(errors.New(string(packet[7:])))
+		if err != nil {
+			return trace.Wrap(err)
+		}
 	}
 	return nil
-
-	packet, err = protocol.ReadPacket(clientConn)
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	handshakeResponse, err := protocol.UnpackHandshakeResponse41(packet)
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	p.Log.Debugf("%#v", handshakeResponse)
-	_, err = clientConn.Write(protocol.NewOKPacket().Encode())
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	packet, err = protocol.ReadPacket(clientConn)
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	p.Log.Debugf("%v", packet)
-	return trace.NotImplemented("not implemented")
-	// startupMessage, tlsConn, backend, err := p.handleStartup(ctx, clientConn)
-	// if err != nil {
-	// 	return trace.Wrap(err)
-	// }
-	// defer func() {
-	// 	if err != nil {
-	// 		if err := backend.Send(toErrorResponse(err)); err != nil {
-	// 			p.Log.WithError(err).Warn("Failed to send error to backend.")
-	// 		}
-	// 	}
-	// }()
-	// ctx, err = p.Middleware.WrapContext(ctx, tlsConn)
-	// if err != nil {
-	// 	return trace.Wrap(err)
-	// }
-	// siteConn, err := p.ConnectToSite(ctx)
-	// if err != nil {
-	// 	return trace.Wrap(err)
-	// }
-	// defer siteConn.Close()
-	// err = p.proxyToSite(ctx, tlsConn, siteConn, startupMessage)
-	// if err != nil {
-	// 	return trace.Wrap(err)
-	// }
-	// return nil
 }
 
 // proxyToSite starts proxying all traffic received from Postgres client
@@ -234,3 +182,11 @@ func (p *Proxy) proxyToSite(ctx context.Context, clientConn, siteConn net.Conn) 
 	}
 	return trace.NewAggregate(errs...)
 }
+
+const (
+	// serverVersion is advertised to MySQL clients during handshake.
+	//
+	// Some clients may refuse to work with older servers (e.g. MySQL
+	// Workbench requires > 5.5).
+	serverVersion = "8.0.0-Teleport"
+)

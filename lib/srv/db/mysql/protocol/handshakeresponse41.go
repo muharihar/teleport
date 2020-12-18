@@ -5,32 +5,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
-	"net"
 
 	"github.com/gravitational/trace"
 )
-
-// ReadPacket ...
-func ReadPacket(conn net.Conn) ([]byte, error) {
-
-	// Read packet header
-	header := []byte{0, 0, 0, 0}
-	if _, err := io.ReadFull(conn, header); err != nil {
-		return nil, err
-	}
-
-	// Calculate packet body length
-	bodyLen := int(uint32(header[0]) | uint32(header[1])<<8 | uint32(header[2])<<16)
-
-	// Read packet body
-	body := make([]byte, bodyLen)
-	n, err := io.ReadFull(conn, body)
-	if err != nil {
-		return nil, err
-	}
-
-	return append(header, body[0:n]...), nil
-}
 
 type HandshakeResponse41 struct {
 	Header          []byte
