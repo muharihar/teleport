@@ -295,6 +295,8 @@ github.com/gravitational/go-mysql v1.1.1-0.20201216171054-3c12623cdaf9 h1:O4F4qe
 github.com/gravitational/go-mysql v1.1.1-0.20201216171054-3c12623cdaf9/go.mod h1:re0JQZ1Cy5dVlIDGq0YksfDIla/GRZlxqOoC0XPSSGE=
 github.com/gravitational/go-mysql v1.1.1-0.20201216183257-194a01c43b67 h1:82uG8LQEKOefLxDKwV09XGDw2iqBGeNj6+Yw+UPoLq4=
 github.com/gravitational/go-mysql v1.1.1-0.20201216183257-194a01c43b67/go.mod h1:re0JQZ1Cy5dVlIDGq0YksfDIla/GRZlxqOoC0XPSSGE=
+github.com/gravitational/go-mysql v1.1.1-0.20201221203007-8ef34676bbc0 h1:oN3ip7mSVgX+14rc13yJh+rUpdzmO/DHJH+GzX9+dnY=
+github.com/gravitational/go-mysql v1.1.1-0.20201221203007-8ef34676bbc0/go.mod h1:re0JQZ1Cy5dVlIDGq0YksfDIla/GRZlxqOoC0XPSSGE=
 github.com/gravitational/go-oidc v0.0.3 h1:VKhztRfuXq5KVcAPAEagF2y9rjoNgEXvZ/5PsRX9qt8=
 github.com/gravitational/go-oidc v0.0.3/go.mod h1:SevmOUNdOB0aD9BAIgjptZ6oHkKxMZZgA70nwPfgU/w=
 github.com/gravitational/gobpf v0.0.1 h1:1NufkXUOOt/farCC4juGZ8FFU1qmA+2Zb4lPaVfUFoE=
