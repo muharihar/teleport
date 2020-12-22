@@ -50,7 +50,7 @@ func Add(cluster, name, user, database string, profile client.ProfileStatus, qui
 		Port:        addr.Port(defaults.HTTPListenPort),
 		User:        user,
 		Database:    database,
-		SSLMode:     SSLModeVerifyFull, // TODO(r0mant): Support insecure mode.
+		Insecure:    false, // TODO(r0mant): Support insecure mode.
 		SSLRootCert: profile.CACertPath(),
 		SSLCert:     profile.DatabaseCertPath(name),
 		SSLKey:      profile.KeyPath(),
@@ -167,7 +167,11 @@ func (s *ServiceFile) Upsert(profile ConnectProfile) error {
 	if profile.Database != "" {
 		section.NewKey("dbname", profile.Database)
 	}
-	section.NewKey("sslmode", profile.SSLMode)
+	if profile.Insecure {
+		section.NewKey("sslmode", SSLModeVerifyCA)
+	} else {
+		section.NewKey("sslmode", SSLModeVerifyFull)
+	}
 	section.NewKey("sslrootcert", profile.SSLRootCert)
 	section.NewKey("sslcert", profile.SSLCert)
 	section.NewKey("sslkey", profile.SSLKey)
@@ -252,8 +256,8 @@ type ConnectProfile struct {
 	User string
 	// Database is an optional database name.
 	Database string
-	// SSLMode is the SSL connection mode.
-	SSLMode string
+	// Insecure is whether to skip certificate validation.a
+	Insecure bool
 	// SSLRootCert is the CA certificate path.
 	SSLRootCert string
 	// SSLCert is the client certificate path.
@@ -265,8 +269,12 @@ type ConnectProfile struct {
 // pgServiceFile is the default name of the Postgres service file.
 const pgServiceFile = ".pg_service.conf"
 
-// SSLModeVerifyFull is the Postgres SSL "verify-full" mode.
-const SSLModeVerifyFull = "verify-full"
+const (
+	// SSLModeVerifyFull is the Postgres SSL "verify-full" mode.
+	SSLModeVerifyFull = "verify-full"
+	// SSLModeVerifyCA is the Postgres SSL "verify-ca" mode.
+	SSLModeVerifyCA = "verify-ca"
+)
 
 // tshMessage is printed after Postgres service file has been updated.
 var tshMessageTpl = template.Must(template.New("").Parse(`

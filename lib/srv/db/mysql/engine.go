@@ -21,7 +21,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"fmt"
 	"net"
 
 	"github.com/gravitational/teleport/lib/auth"
@@ -160,7 +159,6 @@ func (e *Engine) connect(ctx context.Context, sessionCtx *session.Context) (*cli
 			return nil, trace.Wrap(err)
 		}
 	}
-	fmt.Printf("=== DEBUG === PASSWORD: %q\n", password)
 	conn, err := client.Connect(sessionCtx.Server.GetURI(),
 		sessionCtx.DatabaseUser,
 		password,
@@ -171,7 +169,6 @@ func (e *Engine) connect(ctx context.Context, sessionCtx *session.Context) (*cli
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	e.Log.Debugf("%#v", conn)
 	return conn, nil
 }
 

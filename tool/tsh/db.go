@@ -23,6 +23,7 @@ import (
 
 	"github.com/gravitational/teleport/lib/auth/proto"
 	"github.com/gravitational/teleport/lib/client"
+	"github.com/gravitational/teleport/lib/client/mysql"
 	"github.com/gravitational/teleport/lib/client/pgservicefile"
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/services"
@@ -54,7 +55,7 @@ func onListDatabases(cf *CLIConf) {
 	if err != nil {
 		utils.FatalError(err)
 	}
-	showDatabases(servers, profile.Databases, cf.Verbose)
+	showDatabases(tc.SiteName, servers, profile.Databases, cf.Verbose)
 }
 
 // onDatabaseLogin handles "tsh db login" command.
@@ -115,6 +116,11 @@ func databaseLogin(cf *CLIConf, tc *client.TeleportClient, db tlsca.RouteToDatab
 	switch db.Protocol {
 	case defaults.ProtocolPostgres:
 		err := pgservicefile.Add(tc.SiteName, db.ServiceName, db.Username, db.Database, *profile, quiet)
+		if err != nil {
+			return trace.Wrap(err)
+		}
+	case defaults.ProtocolMySQL:
+		err := mysql.Add(tc.SiteName, db.ServiceName, db.Username, db.Database, *profile, quiet)
 		if err != nil {
 			return trace.Wrap(err)
 		}
@@ -186,6 +192,11 @@ func databaseLogout(tc *client.TeleportClient, db tlsca.RouteToDatabase) error {
 		if err != nil {
 			return trace.Wrap(err)
 		}
+	case defaults.ProtocolMySQL:
+		err := mysql.Delete(tc.SiteName, db.ServiceName)
+		if err != nil {
+			return trace.Wrap(err)
+		}
 	}
 	// Then remove the certificate from the keystore.
 	err := tc.LogoutDatabase(db.ServiceName)
@@ -204,18 +215,36 @@ func onDatabaseEnv(cf *CLIConf) {
 	if len(profile.Databases) == 0 {
 		utils.FatalError(trace.BadParameter("Please login using 'tsh db login' first"))
 	}
-	database := cf.DatabaseService
-	if database == "" {
+	name := cf.DatabaseService
+	if name == "" {
 		services := profile.DatabaseServices()
 		if len(services) > 1 {
 			utils.FatalError(trace.BadParameter("Multiple databases are available (%v), please select the one to print environment for via --db flag",
 				strings.Join(services, ", ")))
 		}
-		database = services[0]
+		name = services[0]
 	}
-	env, err := pgservicefile.Env(profile.Cluster, database)
-	if err != nil {
-		utils.FatalError(err)
+	var database *tlsca.RouteToDatabase
+	for _, db := range profile.Databases {
+		if db.ServiceName == name {
+			database = &db
+		}
+	}
+	if database == nil {
+		utils.FatalError(trace.NotFound("Not logged into database %q", name))
+	}
+	var env map[string]string
+	switch database.Protocol {
+	case defaults.ProtocolPostgres:
+		env, err = pgservicefile.Env(profile.Cluster, name)
+		if err != nil {
+			utils.FatalError(err)
+		}
+	case defaults.ProtocolMySQL:
+		env, err = mysql.Env(profile.Cluster, name)
+		if err != nil {
+			utils.FatalError(err)
+		}
 	}
 	for k, v := range env {
 		fmt.Printf("export %v=%v\n", k, v)
