@@ -115,12 +115,12 @@ func databaseLogin(cf *CLIConf, tc *client.TeleportClient, db tlsca.RouteToDatab
 	// connection service file.
 	switch db.Protocol {
 	case defaults.ProtocolPostgres:
-		err := pgservicefile.Add(tc.SiteName, db.ServiceName, db.Username, db.Database, *profile, quiet)
+		err := pgservicefile.Add(tc, db.ServiceName, db.Username, db.Database, *profile, quiet)
 		if err != nil {
 			return trace.Wrap(err)
 		}
 	case defaults.ProtocolMySQL:
-		err := mysql.Add(tc.SiteName, db.ServiceName, db.Username, db.Database, *profile, quiet)
+		err := mysql.Add(tc, db.ServiceName, db.Username, db.Database, *profile, quiet)
 		if err != nil {
 			return trace.Wrap(err)
 		}
@@ -236,6 +236,10 @@ func onDatabaseEnv(cf *CLIConf) {
 
 // onDatabaseConfig handles "tsh db config" command.
 func onDatabaseConfig(cf *CLIConf) {
+	tc, err := makeClient(cf, false)
+	if err != nil {
+		utils.FatalError(err)
+	}
 	profile, err := client.StatusCurrent("", cf.Proxy)
 	if err != nil {
 		utils.FatalError(err)
@@ -244,11 +248,12 @@ func onDatabaseConfig(cf *CLIConf) {
 	if err != nil {
 		utils.FatalError(err)
 	}
-	addr, err := utils.ParseAddr(profile.ProxyURL.Host)
-	if err != nil {
-		utils.FatalError(err)
+	host, port := tc.WebProxyHostPort()
+	if database.Protocol == defaults.ProtocolMySQL {
+		host, port = tc.MySQLProxyHostPort()
 	}
-	fmt.Printf(`Host:      %v
+	fmt.Printf(`Name:      %v
+Host:      %v
 Port:      %v
 User:      %v
 Database:  %v
@@ -256,7 +261,7 @@ CA:        %v
 Cert:      %v
 Key:       %v
 `,
-		addr.Host(), addr.Port(defaults.HTTPListenPort), database.Username,
+		database.ServiceName, host, port, database.Username,
 		database.Database, profile.CACertPath(),
 		profile.DatabaseCertPath(database.ServiceName), profile.KeyPath())
 }
@@ -274,7 +279,7 @@ func pickActiveDatabase(cf *CLIConf) (*tlsca.RouteToDatabase, error) {
 	if name == "" {
 		services := profile.DatabaseServices()
 		if len(services) > 1 {
-			return nil, trace.BadParameter("Multiple databases are available (%v), please select the one to print environment for via --db flag",
+			return nil, trace.BadParameter("Multiple databases are available (%v), please select one using --db flag",
 				strings.Join(services, ", "))
 		}
 		name = services[0]

@@ -35,7 +35,7 @@ import (
 
 // Add updates Postgres connection service file at the default location with
 // the connection information for the provided profile.
-func Add(cluster, name, user, database string, profile client.ProfileStatus, quiet bool) error {
+func Add(tc *client.TeleportClient, name, user, database string, profile client.ProfileStatus, quiet bool) error {
 	serviceFile, err := Load()
 	if err != nil {
 		return trace.Wrap(err)
@@ -45,7 +45,7 @@ func Add(cluster, name, user, database string, profile client.ProfileStatus, qui
 		return trace.Wrap(err)
 	}
 	connectProfile := ConnectProfile{
-		Name:        serviceName(cluster, name),
+		Name:        serviceName(tc.SiteName, name),
 		Host:        addr.Host(),
 		Port:        addr.Port(defaults.HTTPListenPort),
 		User:        user,

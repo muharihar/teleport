@@ -60,6 +60,9 @@ const (
 	// serve auth requests.
 	AuthListenPort = 3025
 
+	// MySQLListenPort is the default listen port for MySQL proxy.
+	MySQLListenPort = 3036
+
 	// Default DB to use for persisting state. Another options is "etcd"
 	BackendType = "bolt"
 

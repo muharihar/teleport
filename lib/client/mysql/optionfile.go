@@ -27,8 +27,6 @@ import (
 
 	"github.com/gravitational/teleport/lib/client"
 	"github.com/gravitational/teleport/lib/client/pgservicefile"
-	"github.com/gravitational/teleport/lib/defaults"
-	"github.com/gravitational/teleport/lib/utils"
 
 	"github.com/gravitational/trace"
 	"gopkg.in/ini.v1"
@@ -36,19 +34,16 @@ import (
 
 // Add updates Postgres connection service file at the default location with
 // the connection information for the provided profile.
-func Add(cluster, name, user, database string, profile client.ProfileStatus, quiet bool) error {
+func Add(tc *client.TeleportClient, name, user, database string, profile client.ProfileStatus, quiet bool) error {
 	serviceFile, err := Load()
 	if err != nil {
 		return trace.Wrap(err)
 	}
-	addr, err := utils.ParseAddr(profile.ProxyURL.Host)
-	if err != nil {
-		return trace.Wrap(err)
-	}
+	host, port := tc.MySQLProxyHostPort()
 	connectProfile := pgservicefile.ConnectProfile{
-		Name:        serviceName(cluster, name),
-		Host:        addr.Host(),
-		Port:        addr.Port(defaults.HTTPListenPort),
+		Name:        serviceName(tc.SiteName, name),
+		Host:        host,
+		Port:        port,
 		User:        user,
 		Database:    database,
 		Insecure:    false, // TODO(r0mant): Support insecure mode.

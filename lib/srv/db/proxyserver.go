@@ -137,6 +137,28 @@ func (s *ProxyServer) Serve(listener net.Listener) error {
 	}
 }
 
+// ServeMySQL starts accepting MySQL client connections.
+func (s *ProxyServer) ServeMySQL(listener net.Listener) error {
+	s.log.Debug("Started MySQL proxy.")
+	defer s.log.Debug("MySQL proxy exited.")
+	for {
+		// Accept the connection from a MySQL client.
+		clientConn, err := listener.Accept()
+		if err != nil {
+			return trace.Wrap(err)
+		}
+		// Pass over to the MySQL proxy handler.
+		go func() {
+			defer clientConn.Close()
+			err := s.mysqlProxy().HandleConnection(s.closeCtx, clientConn)
+			if err != nil {
+				s.log.Errorf("Failed to handle MySQL client connection: %v.",
+					trace.DebugReport(err))
+			}
+		}()
+	}
+}
+
 // DatabaseProxy defines an interface a database proxy should implement.
 type DatabaseProxy interface {
 	// HandleConnection takes the client connection, handles all database
@@ -153,23 +175,30 @@ func (s *ProxyServer) dispatch(clientConn net.Conn) (DatabaseProxy, error) {
 	switch muxConn.Protocol() {
 	case multiplexer.ProtoPostgres:
 		s.log.Debugf("Accepted Postgres connection from %v.", muxConn.RemoteAddr())
-		return &postgres.Proxy{
-			TLSConfig:     s.cfg.TLSConfig,
-			Middleware:    s.middleware,
-			ConnectToSite: s.connectToSite,
-			Log:           s.log,
-		}, nil
-	case multiplexer.ProtoMySQL:
-		s.log.Debugf("Accepted MySQL connection from %v.", muxConn.RemoteAddr())
-		return &mysql.Proxy{
-			TLSConfig:     s.cfg.TLSConfig,
-			Middleware:    s.middleware,
-			ConnectToSite: s.connectToSite,
-			Log:           s.log,
-		}, nil
+		return s.postgresProxy(), nil
 	}
 	return nil, trace.BadParameter("unsupported database protocol %q",
 		muxConn.Protocol())
+}
+
+// postgresProxy returns a new instance of the Postgres protocol aware proxy.
+func (s *ProxyServer) postgresProxy() *postgres.Proxy {
+	return &postgres.Proxy{
+		TLSConfig:     s.cfg.TLSConfig,
+		Middleware:    s.middleware,
+		ConnectToSite: s.connectToSite,
+		Log:           s.log,
+	}
+}
+
+// mysqlProxy returns a new instance of the MySQL protocol aware proxy.
+func (s *ProxyServer) mysqlProxy() *mysql.Proxy {
+	return &mysql.Proxy{
+		TLSConfig:     s.cfg.TLSConfig,
+		Middleware:    s.middleware,
+		ConnectToSite: s.connectToSite,
+		Log:           s.log,
+	}
 }
 
 // connectToSite connects to the database server running on a remote site

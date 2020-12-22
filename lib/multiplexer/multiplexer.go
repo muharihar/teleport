@@ -29,11 +29,11 @@ import (
 	"context"
 	"io"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/gravitational/teleport"
+	"github.com/gravitational/teleport/lib/defaults"
 
 	"github.com/gravitational/trace"
 	"github.com/jonboulle/clockwork"
@@ -73,9 +73,7 @@ func (c *Config) CheckAndSetDefaults() error {
 		c.Context = context.TODO()
 	}
 	if c.ReadDeadline == 0 {
-		//c.ReadDeadline = defaults.ReadHeadersTimeout
-		// TODO(r0mant): Change to separate listener.
-		c.ReadDeadline = 100 * time.Millisecond
+		c.ReadDeadline = defaults.ReadHeadersTimeout
 	}
 	if c.Clock == nil {
 		c.Clock = clockwork.NewRealClock()
@@ -249,10 +247,10 @@ func (m *Mux) detectAndForward(conn net.Conn) {
 	case ProtoHTTP:
 		m.Debug("Detected an HTTP request. If this is for a health check, use an HTTPS request instead.")
 		conn.Close()
-	case ProtoPostgres, ProtoMySQL:
-		m.WithField("protocol", connWrapper.protocol).Debug("Detected database client connection.")
+	case ProtoPostgres:
+		m.WithField("protocol", connWrapper.protocol).Debug("Detected Postgres client connection.")
 		if m.DisableDB {
-			m.Debug("Closing database client connection: db proxy listener is disabled.")
+			m.Debug("Closing Postgres client connection: db proxy listener is disabled.")
 			conn.Close()
 			return
 		}
@@ -281,14 +279,6 @@ func detect(conn net.Conn, enableProxyProtocol bool) (*Conn, error) {
 	for i := 0; i < 2; i++ {
 		bytes, err := reader.Peek(8)
 		if err != nil {
-			// TODO(r0mant): Change to separate MySQL listener.
-			if strings.Contains(err.Error(), "i/o timeout") {
-				return &Conn{
-					protocol: ProtoMySQL,
-					Conn:     conn,
-					reader:   reader,
-				}, nil
-			}
 			return nil, trace.Wrap(err, "failed to peek connection")
 		}
 
@@ -342,8 +332,6 @@ const (
 	ProtoHTTP
 	// ProtoPostgres is PostgreSQL wire protocol
 	ProtoPostgres
-	// ProtoMySQL is MySQL wire protocol
-	ProtoMySQL
 )
 
 var (
