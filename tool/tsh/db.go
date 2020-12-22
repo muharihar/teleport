@@ -212,36 +212,19 @@ func onDatabaseEnv(cf *CLIConf) {
 	if err != nil {
 		utils.FatalError(err)
 	}
-	if len(profile.Databases) == 0 {
-		utils.FatalError(trace.BadParameter("Please login using 'tsh db login' first"))
-	}
-	name := cf.DatabaseService
-	if name == "" {
-		services := profile.DatabaseServices()
-		if len(services) > 1 {
-			utils.FatalError(trace.BadParameter("Multiple databases are available (%v), please select the one to print environment for via --db flag",
-				strings.Join(services, ", ")))
-		}
-		name = services[0]
-	}
-	var database *tlsca.RouteToDatabase
-	for _, db := range profile.Databases {
-		if db.ServiceName == name {
-			database = &db
-		}
-	}
-	if database == nil {
-		utils.FatalError(trace.NotFound("Not logged into database %q", name))
+	database, err := pickActiveDatabase(cf)
+	if err != nil {
+		utils.FatalError(err)
 	}
 	var env map[string]string
 	switch database.Protocol {
 	case defaults.ProtocolPostgres:
-		env, err = pgservicefile.Env(profile.Cluster, name)
+		env, err = pgservicefile.Env(profile.Cluster, database.ServiceName)
 		if err != nil {
 			utils.FatalError(err)
 		}
 	case defaults.ProtocolMySQL:
-		env, err = mysql.Env(profile.Cluster, name)
+		env, err = mysql.Env(profile.Cluster, database.ServiceName)
 		if err != nil {
 			utils.FatalError(err)
 		}
@@ -249,4 +232,57 @@ func onDatabaseEnv(cf *CLIConf) {
 	for k, v := range env {
 		fmt.Printf("export %v=%v\n", k, v)
 	}
+}
+
+// onDatabaseConfig handles "tsh db config" command.
+func onDatabaseConfig(cf *CLIConf) {
+	profile, err := client.StatusCurrent("", cf.Proxy)
+	if err != nil {
+		utils.FatalError(err)
+	}
+	database, err := pickActiveDatabase(cf)
+	if err != nil {
+		utils.FatalError(err)
+	}
+	addr, err := utils.ParseAddr(profile.ProxyURL.Host)
+	if err != nil {
+		utils.FatalError(err)
+	}
+	fmt.Printf(`Host:      %v
+Port:      %v
+User:      %v
+Database:  %v
+CA:        %v
+Cert:      %v
+Key:       %v
+`,
+		addr.Host(), addr.Port(defaults.HTTPListenPort), database.Username,
+		database.Database, profile.CACertPath(),
+		profile.DatabaseCertPath(database.ServiceName), profile.KeyPath())
+}
+
+// pickActiveDatabase returns the database the current profile is logged into.
+func pickActiveDatabase(cf *CLIConf) (*tlsca.RouteToDatabase, error) {
+	profile, err := client.StatusCurrent("", cf.Proxy)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	if len(profile.Databases) == 0 {
+		return nil, trace.NotFound("Please login using 'tsh db login' first")
+	}
+	name := cf.DatabaseService
+	if name == "" {
+		services := profile.DatabaseServices()
+		if len(services) > 1 {
+			return nil, trace.BadParameter("Multiple databases are available (%v), please select the one to print environment for via --db flag",
+				strings.Join(services, ", "))
+		}
+		name = services[0]
+	}
+	for _, db := range profile.Databases {
+		if db.ServiceName == name {
+			return &db, nil
+		}
+	}
+	return nil, trace.NotFound("Not logged into database %q", name)
 }

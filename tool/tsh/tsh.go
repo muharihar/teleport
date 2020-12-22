@@ -296,6 +296,8 @@ func Run(args []string) {
 	dbLogout.Arg("db", "Database to remove credentials for.").StringVar(&cf.DatabaseService)
 	dbEnv := db.Command("env", "Print environment variables for the configured database.")
 	dbEnv.Flag("db", "Database to print environment for if logged into multiple.").StringVar(&cf.DatabaseService)
+	dbConfig := db.Command("config", "Print database connection information. Useful when configuring GUI clients.")
+	dbConfig.Flag("db", "Database to print information for if logged into multiple.").StringVar(&cf.DatabaseService)
 
 	// join
 	join := app.Command("join", "Join the active SSH session")
@@ -455,6 +457,8 @@ func Run(args []string) {
 		onDatabaseLogout(&cf)
 	case dbEnv.FullCommand():
 		onDatabaseEnv(&cf)
+	case dbConfig.FullCommand():
+		onDatabaseConfig(&cf)
 	default:
 		// This should only happen when there's a missing switch case above.
 		err = trace.BadParameter("command %q not configured", command)
