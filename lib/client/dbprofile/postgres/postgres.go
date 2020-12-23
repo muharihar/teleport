@@ -14,90 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pgservicefile
+package postgres
 
 import (
-	"fmt"
-	"os"
 	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"text/template"
 
-	"github.com/gravitational/teleport/lib/client"
-	"github.com/gravitational/teleport/lib/defaults"
-	"github.com/gravitational/teleport/lib/utils"
+	"github.com/gravitational/teleport/lib/client/dbprofile/profile"
 
 	"github.com/gravitational/trace"
 	"gopkg.in/ini.v1"
 )
-
-// Add updates Postgres connection service file at the default location with
-// the connection information for the provided profile.
-func Add(tc *client.TeleportClient, name, user, database string, profile client.ProfileStatus, quiet bool) error {
-	serviceFile, err := Load()
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	addr, err := utils.ParseAddr(profile.ProxyURL.Host)
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	connectProfile := ConnectProfile{
-		Name:        serviceName(tc.SiteName, name),
-		Host:        addr.Host(),
-		Port:        addr.Port(defaults.HTTPListenPort),
-		User:        user,
-		Database:    database,
-		Insecure:    false, // TODO(r0mant): Support insecure mode.
-		SSLRootCert: profile.CACertPath(),
-		SSLCert:     profile.DatabaseCertPath(name),
-		SSLKey:      profile.KeyPath(),
-	}
-	err = serviceFile.Upsert(connectProfile)
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	if quiet {
-		return nil
-	}
-	return tshMessageTpl.Execute(os.Stdout, connectProfile)
-}
-
-// Env returns environment variables for the provided Postgres service from
-// the default connection service file.
-func Env(cluster, name string) (map[string]string, error) {
-	serviceFile, err := Load()
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	env, err := serviceFile.Env(serviceName(cluster, name))
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	return env, nil
-}
-
-// Delete deletes specified connection profile from the default Postgres
-// service file.
-func Delete(cluster, name string) error {
-	serviceFile, err := Load()
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	err = serviceFile.Delete(serviceName(cluster, name))
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	return nil
-}
-
-// serviceName constructs the Postgres connection service name from the
-// Teleport cluster name and the database service name.
-func serviceName(cluster, name string) string {
-	return fmt.Sprintf("%v-%v", cluster, name)
-}
 
 // ServiceFile represents Postgres connection service file.
 //
@@ -150,7 +80,7 @@ func LoadFromPath(path string) (*ServiceFile, error) {
 // parameter:
 //
 //   $ psql "service=postgres <other parameters>"
-func (s *ServiceFile) Upsert(profile ConnectProfile) error {
+func (s *ServiceFile) Upsert(profile profile.ConnectProfile) error {
 	section := s.iniFile.Section(profile.Name)
 	if section != nil {
 		s.iniFile.DeleteSection(profile.Name)
@@ -244,40 +174,17 @@ func (s *ServiceFile) Delete(name string) error {
 	return s.iniFile.SaveTo(s.path)
 }
 
-// ConnectProfile represents a single connection profile in the service file.
-type ConnectProfile struct {
-	// Name is the profile name.
-	Name string
-	// Host is the host to connect to.
-	Host string
-	// Port is the port number to connect to.
-	Port int
-	// User is an optional database user name.
-	User string
-	// Database is an optional database name.
-	Database string
-	// Insecure is whether to skip certificate validation.a
-	Insecure bool
-	// SSLRootCert is the CA certificate path.
-	SSLRootCert string
-	// SSLCert is the client certificate path.
-	SSLCert string
-	// SSLKey is the client key path.
-	SSLKey string
-}
-
-// pgServiceFile is the default name of the Postgres service file.
-const pgServiceFile = ".pg_service.conf"
-
 const (
 	// SSLModeVerifyFull is the Postgres SSL "verify-full" mode.
 	SSLModeVerifyFull = "verify-full"
 	// SSLModeVerifyCA is the Postgres SSL "verify-ca" mode.
 	SSLModeVerifyCA = "verify-ca"
+	// pgServiceFile is the default name of the Postgres service file.
+	pgServiceFile = ".pg_service.conf"
 )
 
-// tshMessage is printed after Postgres service file has been updated.
-var tshMessageTpl = template.Must(template.New("").Parse(`
+// Message is printed after Postgres service file has been updated.
+var Message = template.Must(template.New("").Parse(`
 Connection information for PostgreSQL database "{{.Name}}" has been saved.
 
 You can now connect to the database using the following command:

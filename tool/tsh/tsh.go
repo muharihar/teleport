@@ -40,8 +40,8 @@ import (
 	"github.com/gravitational/teleport/lib/backend"
 	"github.com/gravitational/teleport/lib/benchmark"
 	"github.com/gravitational/teleport/lib/client"
+	"github.com/gravitational/teleport/lib/client/dbprofile"
 	"github.com/gravitational/teleport/lib/client/identityfile"
-	"github.com/gravitational/teleport/lib/client/pgservicefile"
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/events"
 	"github.com/gravitational/teleport/lib/kube/kubeconfig"
@@ -831,7 +831,7 @@ func onLogout(cf *CLIConf) {
 		if profile != nil {
 			for _, db := range profile.Databases {
 				log.Debugf("Logging %v out of database %v.", profile.Name, db)
-				err = pgservicefile.Delete(profile.Cluster, db.ServiceName)
+				err = dbprofile.Delete(tc, db)
 				if err != nil {
 					utils.FatalError(err)
 					return
@@ -893,7 +893,7 @@ func onLogout(cf *CLIConf) {
 		for _, profile := range profiles {
 			for _, db := range profile.Databases {
 				log.Debugf("Logging %v out of database %v.", profile.Name, db)
-				err = pgservicefile.Delete(profile.Cluster, db.ServiceName)
+				err = dbprofile.Delete(tc, db)
 				if err != nil {
 					utils.FatalError(err)
 					return

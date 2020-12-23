@@ -23,8 +23,7 @@ import (
 
 	"github.com/gravitational/teleport/lib/auth/proto"
 	"github.com/gravitational/teleport/lib/client"
-	"github.com/gravitational/teleport/lib/client/mysql"
-	"github.com/gravitational/teleport/lib/client/pgservicefile"
+	"github.com/gravitational/teleport/lib/client/dbprofile"
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/services"
 	"github.com/gravitational/teleport/lib/tlsca"
@@ -111,19 +110,10 @@ func databaseLogin(cf *CLIConf, tc *client.TeleportClient, db tlsca.RouteToDatab
 	if err != nil {
 		utils.FatalError(err)
 	}
-	// Perform database-specific actions such as updating Postgres
-	// connection service file.
-	switch db.Protocol {
-	case defaults.ProtocolPostgres:
-		err := pgservicefile.Add(tc, db.ServiceName, db.Username, db.Database, *profile, quiet)
-		if err != nil {
-			return trace.Wrap(err)
-		}
-	case defaults.ProtocolMySQL:
-		err := mysql.Add(tc, db.ServiceName, db.Username, db.Database, *profile, quiet)
-		if err != nil {
-			return trace.Wrap(err)
-		}
+	// Update the database-specific connection profile file.
+	err = dbprofile.Add(tc, db, *profile, quiet)
+	if err != nil {
+		return trace.Wrap(err)
 	}
 	return nil
 }
@@ -184,22 +174,13 @@ func onDatabaseLogout(cf *CLIConf) {
 }
 
 func databaseLogout(tc *client.TeleportClient, db tlsca.RouteToDatabase) error {
-	// First perform database-specific actions, such as remove connection
-	// information from Postgres service file.
-	switch db.Protocol {
-	case defaults.ProtocolPostgres:
-		err := pgservicefile.Delete(tc.SiteName, db.ServiceName)
-		if err != nil {
-			return trace.Wrap(err)
-		}
-	case defaults.ProtocolMySQL:
-		err := mysql.Delete(tc.SiteName, db.ServiceName)
-		if err != nil {
-			return trace.Wrap(err)
-		}
+	// First remove respective connection profile.
+	err := dbprofile.Delete(tc, db)
+	if err != nil {
+		return trace.Wrap(err)
 	}
 	// Then remove the certificate from the keystore.
-	err := tc.LogoutDatabase(db.ServiceName)
+	err = tc.LogoutDatabase(db.ServiceName)
 	if err != nil {
 		return trace.Wrap(err)
 	}
@@ -208,7 +189,7 @@ func databaseLogout(tc *client.TeleportClient, db tlsca.RouteToDatabase) error {
 
 // onDatabaseEnv handles "tsh db env" command.
 func onDatabaseEnv(cf *CLIConf) {
-	profile, err := client.StatusCurrent("", cf.Proxy)
+	tc, err := makeClient(cf, false)
 	if err != nil {
 		utils.FatalError(err)
 	}
@@ -216,18 +197,9 @@ func onDatabaseEnv(cf *CLIConf) {
 	if err != nil {
 		utils.FatalError(err)
 	}
-	var env map[string]string
-	switch database.Protocol {
-	case defaults.ProtocolPostgres:
-		env, err = pgservicefile.Env(profile.Cluster, database.ServiceName)
-		if err != nil {
-			utils.FatalError(err)
-		}
-	case defaults.ProtocolMySQL:
-		env, err = mysql.Env(profile.Cluster, database.ServiceName)
-		if err != nil {
-			utils.FatalError(err)
-		}
+	env, err := dbprofile.Env(tc, *database)
+	if err != nil {
+		utils.FatalError(err)
 	}
 	for k, v := range env {
 		fmt.Printf("export %v=%v\n", k, v)

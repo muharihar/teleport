@@ -17,81 +17,17 @@ limitations under the License.
 package mysql
 
 import (
-	"fmt"
-	"os"
 	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"text/template"
 
-	"github.com/gravitational/teleport/lib/client"
-	"github.com/gravitational/teleport/lib/client/pgservicefile"
+	"github.com/gravitational/teleport/lib/client/dbprofile/profile"
 
 	"github.com/gravitational/trace"
 	"gopkg.in/ini.v1"
 )
-
-// Add updates Postgres connection service file at the default location with
-// the connection information for the provided profile.
-func Add(tc *client.TeleportClient, name, user, database string, profile client.ProfileStatus, quiet bool) error {
-	serviceFile, err := Load()
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	host, port := tc.MySQLProxyHostPort()
-	connectProfile := pgservicefile.ConnectProfile{
-		Name:        serviceName(tc.SiteName, name),
-		Host:        host,
-		Port:        port,
-		User:        user,
-		Database:    database,
-		Insecure:    false, // TODO(r0mant): Support insecure mode.
-		SSLRootCert: profile.CACertPath(),
-		SSLCert:     profile.DatabaseCertPath(name),
-		SSLKey:      profile.KeyPath(),
-	}
-	err = serviceFile.Upsert(connectProfile)
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	if quiet {
-		return nil
-	}
-	return messageTpl.Execute(os.Stdout, connectProfile)
-}
-
-// Env returns environment variables for the provided Postgres service from
-// the default connection service file.
-func Env(cluster, name string) (map[string]string, error) {
-	serviceFile, err := Load()
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	env, err := serviceFile.Env(serviceName(cluster, name))
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	return env, nil
-}
-
-// Delete deletes specified connection profile from the default Postgres
-// service file.
-func Delete(cluster, name string) error {
-	serviceFile, err := Load()
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	err = serviceFile.Delete(serviceName(cluster, name))
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	return nil
-}
-
-func serviceName(cluster, name string) string {
-	return fmt.Sprintf("%v-%v", cluster, name)
-}
 
 // OptionFile represents MySQL option file.
 //
@@ -129,14 +65,14 @@ func LoadFromPath(path string) (*OptionFile, error) {
 	}, nil
 }
 
-//
-func (o *OptionFile) Upsert(profile pgservicefile.ConnectProfile) error {
-	name := "client_" + profile.Name
-	section := o.iniFile.Section(name)
+// Upsert saves the provided connection profile in MySQL option file.
+func (o *OptionFile) Upsert(profile profile.ConnectProfile) error {
+	sectionName := o.section(profile.Name)
+	section := o.iniFile.Section(sectionName)
 	if section != nil {
-		o.iniFile.DeleteSection(profile.Name)
+		o.iniFile.DeleteSection(sectionName)
 	}
-	section, err := o.iniFile.NewSection(name)
+	section, err := o.iniFile.NewSection(sectionName)
 	if err != nil {
 		return trace.Wrap(err)
 	}
@@ -148,7 +84,11 @@ func (o *OptionFile) Upsert(profile pgservicefile.ConnectProfile) error {
 	if profile.Database != "" {
 		section.NewKey("database", profile.Database)
 	}
-	// TODO(r0mant): Add insecure mode.
+	if profile.Insecure {
+		section.NewKey("ssl-mode", MySQLSSLModeVerifyCA)
+	} else {
+		section.NewKey("ssl-mode", MySQLSSLModeVerifyIdentity)
+	}
 	section.NewKey("ssl-ca", profile.SSLRootCert)
 	section.NewKey("ssl-cert", profile.SSLCert)
 	section.NewKey("ssl-key", profile.SSLKey)
@@ -156,9 +96,9 @@ func (o *OptionFile) Upsert(profile pgservicefile.ConnectProfile) error {
 	return o.iniFile.SaveTo(o.path)
 }
 
-//
+// Env returns the specified connection profile as environment variables.
 func (o *OptionFile) Env(name string) (map[string]string, error) {
-	_, err := o.iniFile.GetSection("client_" + name)
+	_, err := o.iniFile.GetSection(o.section(name))
 	if err != nil {
 		if strings.Contains(err.Error(), "does not exist") {
 			return nil, trace.NotFound("connection profile %q not found", name)
@@ -166,22 +106,38 @@ func (o *OptionFile) Env(name string) (map[string]string, error) {
 		return nil, trace.Wrap(err)
 	}
 	return map[string]string{
-		"MYSQL_GROUP_SUFFIX": "_" + name,
+		"MYSQL_GROUP_SUFFIX": o.suffix(name),
 	}, nil
 }
 
-//
+// Delete removes the specified connection profile.
 func (o *OptionFile) Delete(name string) error {
-	name = "client_" + name
-	o.iniFile.DeleteSection(name)
+	o.iniFile.DeleteSection(o.section(name))
 	return o.iniFile.SaveTo(o.path)
 }
 
-// mysqlOptionFile is the default name of the MySQL option file.
-const mysqlOptionFile = ".my.cnf"
+// section returns the section name in MySQL option file.
+//
+// Sections that are read by MySQL client start with "client" prefix.
+func (o *OptionFile) section(name string) string {
+	return "client" + o.suffix(name)
+}
 
-// message is printed after MySQL option file has been updated.
-var messageTpl = template.Must(template.New("").Parse(`
+func (o *OptionFile) suffix(name string) string {
+	return "_" + name
+}
+
+const (
+	// MySQLSSLModeVerifyCA is MySQL SSL mode that verifies server CA.
+	MySQLSSLModeVerifyCA = "VERIFY_CA"
+	// MySQLSSLModeVerifyIdentity is MySQL SSL mode that verifies host name.
+	MySQLSSLModeVerifyIdentity = "VERIFY_IDENTITY"
+	// mysqlOptionFile is the default name of the MySQL option file.
+	mysqlOptionFile = ".my.cnf"
+)
+
+// Message is printed after MySQL option file has been updated.
+var Message = template.Must(template.New("").Parse(`
 Connection information for MySQL database "{{.Name}}" has been saved.
 
 You can now connect to the database using the following command:
