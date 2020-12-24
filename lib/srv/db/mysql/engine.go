@@ -18,27 +18,17 @@ package mysql
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
 	"net"
 
-	"github.com/gravitational/teleport/lib/auth"
-	"github.com/gravitational/teleport/lib/auth/native"
-	"github.com/gravitational/teleport/lib/auth/proto"
 	"github.com/gravitational/teleport/lib/events"
+	"github.com/gravitational/teleport/lib/srv/db/auth"
 	"github.com/gravitational/teleport/lib/srv/db/mysql/protocol"
 	"github.com/gravitational/teleport/lib/srv/db/session"
-	"github.com/gravitational/teleport/lib/tlsca"
-	"github.com/gravitational/teleport/lib/utils"
 
 	"github.com/siddontang/go-mysql/client"
 	"github.com/siddontang/go-mysql/mysql"
 	"github.com/siddontang/go-mysql/packet"
 	"github.com/siddontang/go-mysql/server"
-
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/service/rds/rdsutils"
 
 	"github.com/gravitational/trace"
 	"github.com/jonboulle/clockwork"
@@ -51,12 +41,8 @@ import (
 //
 // Implements db.DatabaseEngine.
 type Engine struct {
-	// AuthClient is the cluster auth client.
-	AuthClient *auth.Client
-	// Credentials are the AWS credentials used to generate RDS auth tokens.
-	Credentials *credentials.Credentials
-	// RDSCACerts contains AWS RDS root certificates.
-	RDSCACerts map[string][]byte
+	// Auth handles database access authentication.
+	Auth *auth.Authenticator
 	// StreamWriter is the async audit logger.
 	StreamWriter events.StreamWriter
 	// OnSessionStart is called upon successful connection to the database.
@@ -148,13 +134,13 @@ func (e *Engine) checkAccess(sessionCtx *session.Context) error {
 }
 
 func (e *Engine) connect(ctx context.Context, sessionCtx *session.Context) (*client.Conn, error) {
-	tlsConfig, err := e.getTLSConfig(ctx, sessionCtx)
+	tlsConfig, err := e.Auth.GetTLSConfig(ctx, sessionCtx)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 	var password string
 	if sessionCtx.Server.IsAWS() {
-		password, err = e.getAWSAuthToken(sessionCtx)
+		password, err = e.Auth.GetAWSAuthToken(sessionCtx)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
@@ -217,96 +203,4 @@ func (e *Engine) receiveFromServer(serverConn, clientConn net.Conn, serverErrCh 
 			return
 		}
 	}
-}
-
-// getAWSAuthToken returns authorization token that will be used as a password
-// when connecting to RDS/Aurora databases.
-func (e *Engine) getAWSAuthToken(sessionCtx *session.Context) (string, error) {
-	e.Log.Debugf("Generating auth token for %s.", sessionCtx)
-	return rdsutils.BuildAuthToken(
-		sessionCtx.Server.GetURI(),
-		sessionCtx.Server.GetRegion(),
-		sessionCtx.DatabaseUser,
-		e.Credentials)
-}
-
-// getTLSConfig builds the client TLS configuration for the session.
-//
-// For RDS/Aurora, the config must contain RDS root certificate as a trusted
-// authority. For onprem we generate a client certificate signed by the host
-// CA used to authenticate.
-func (e *Engine) getTLSConfig(ctx context.Context, sessionCtx *session.Context) (*tls.Config, error) {
-	addr, err := utils.ParseAddr(sessionCtx.Server.GetURI())
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	tlsConfig := &tls.Config{
-		ServerName: addr.Host(),
-		RootCAs:    x509.NewCertPool(),
-	}
-	// Add CA certificate to the trusted pool if it's present, e.g. when
-	// connecting to RDS/Aurora which require AWS CA.
-	if len(sessionCtx.Server.GetCA()) != 0 {
-		if !tlsConfig.RootCAs.AppendCertsFromPEM(sessionCtx.Server.GetCA()) {
-			return nil, trace.BadParameter("failed to append CA certificate to the pool")
-		}
-	} else if sessionCtx.Server.IsAWS() {
-		if rdsCA, ok := e.RDSCACerts[sessionCtx.Server.GetRegion()]; ok {
-			if !tlsConfig.RootCAs.AppendCertsFromPEM(rdsCA) {
-				return nil, trace.BadParameter("failed to append CA certificate to the pool")
-			}
-		} else {
-			e.Log.Warnf("No RDS CA certificate for %v.", sessionCtx.Server)
-		}
-	}
-	// RDS/Aurora auth is done via an auth token so don't generate a client
-	// certificate and exit here.
-	if sessionCtx.Server.IsAWS() {
-		return tlsConfig, nil
-	}
-	// Otherwise, when connecting to an onprem database, generate a client
-	// certificate. The database instance should be configured with
-	// Teleport's CA obtained with 'tctl auth sign --type=db'.
-	cert, cas, err := e.getClientCert(ctx, sessionCtx)
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	tlsConfig.Certificates = []tls.Certificate{*cert}
-	for _, ca := range cas {
-		if !tlsConfig.RootCAs.AppendCertsFromPEM(ca) {
-			return nil, trace.BadParameter("failed to append CA certificate to the pool")
-		}
-	}
-	return tlsConfig, nil
-}
-
-// getClientCert signs an ephemeral client certificate used by this
-// server to authenticate with the database instance.
-func (e *Engine) getClientCert(ctx context.Context, sessionCtx *session.Context) (cert *tls.Certificate, cas [][]byte, err error) {
-	privateBytes, _, err := native.GenerateKeyPair("")
-	if err != nil {
-		return nil, nil, trace.Wrap(err)
-	}
-	// Postgres requires the database username to be encoded as a common
-	// name in the client certificate.
-	subject := pkix.Name{CommonName: sessionCtx.DatabaseUser}
-	csr, err := tlsca.GenerateCertificateRequestPEM(subject, privateBytes)
-	if err != nil {
-		return nil, nil, trace.Wrap(err)
-	}
-	// TODO(r0mant): Cache database certificates to avoid expensive generate
-	// operation on each connection.
-	e.Log.Debugf("Generating client certificate for %s.", sessionCtx)
-	resp, err := e.AuthClient.GenerateDatabaseCert(ctx, &proto.DatabaseCertRequest{
-		CSR: csr,
-		TTL: proto.Duration(sessionCtx.Identity.Expires.Sub(e.Clock.Now())),
-	})
-	if err != nil {
-		return nil, nil, trace.Wrap(err)
-	}
-	clientCert, err := tls.X509KeyPair(resp.Cert, privateBytes)
-	if err != nil {
-		return nil, nil, trace.Wrap(err)
-	}
-	return &clientCert, resp.CACerts, nil
 }

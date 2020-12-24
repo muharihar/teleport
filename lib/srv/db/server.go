@@ -29,6 +29,7 @@ import (
 	"github.com/gravitational/teleport/lib/labels"
 	"github.com/gravitational/teleport/lib/services"
 	"github.com/gravitational/teleport/lib/srv"
+	dbauth "github.com/gravitational/teleport/lib/srv/db/auth"
 	"github.com/gravitational/teleport/lib/srv/db/mysql"
 	"github.com/gravitational/teleport/lib/srv/db/postgres"
 	"github.com/gravitational/teleport/lib/srv/db/session"
@@ -368,12 +369,19 @@ type DatabaseEngine interface {
 
 // dispatch returns an appropriate database engine for the session.
 func (s *Server) dispatch(sessionCtx *session.Context, streamWriter events.StreamWriter) (DatabaseEngine, error) {
+	auth, err := dbauth.NewAuthenticator(dbauth.AuthenticatorConfig{
+		AuthClient:  s.cfg.AuthClient,
+		Credentials: s.cfg.Credentials,
+		RDSCACerts:  s.rdsCACerts,
+		Clock:       s.cfg.Clock,
+	})
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
 	switch sessionCtx.Server.GetProtocol() {
 	case defaults.ProtocolPostgres:
 		return &postgres.Engine{
-			AuthClient:     s.cfg.AuthClient,
-			Credentials:    s.cfg.Credentials,
-			RDSCACerts:     s.rdsCACerts,
+			Auth:           auth,
 			OnSessionStart: s.emitSessionStartEventFn(streamWriter),
 			OnSessionEnd:   s.emitSessionEndEventFn(streamWriter),
 			OnQuery:        s.emitQueryEventFn(streamWriter),
@@ -382,9 +390,7 @@ func (s *Server) dispatch(sessionCtx *session.Context, streamWriter events.Strea
 		}, nil
 	case defaults.ProtocolMySQL:
 		return &mysql.Engine{
-			AuthClient:     s.cfg.AuthClient,
-			Credentials:    s.cfg.Credentials,
-			RDSCACerts:     s.rdsCACerts,
+			Auth:           auth,
 			OnSessionStart: s.emitSessionStartEventFn(streamWriter),
 			OnSessionEnd:   s.emitSessionEndEventFn(streamWriter),
 			OnQuery:        s.emitQueryEventFn(streamWriter),
