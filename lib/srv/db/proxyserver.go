@@ -21,7 +21,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io"
 	"net"
+	"strings"
 
 	"github.com/gravitational/teleport/lib/auth"
 	"github.com/gravitational/teleport/lib/auth/native"
@@ -187,6 +189,7 @@ func (s *ProxyServer) postgresProxy() *postgres.Proxy {
 		TLSConfig:     s.cfg.TLSConfig,
 		Middleware:    s.middleware,
 		ConnectToSite: s.connectToSite,
+		ProxyToSite:   s.proxyToSite,
 		Log:           s.log,
 	}
 }
@@ -197,6 +200,7 @@ func (s *ProxyServer) mysqlProxy() *mysql.Proxy {
 		TLSConfig:     s.cfg.TLSConfig,
 		Middleware:    s.middleware,
 		ConnectToSite: s.connectToSite,
+		ProxyToSite:   s.proxyToSite,
 		Log:           s.log,
 	}
 }
@@ -230,6 +234,39 @@ func (s *ProxyServer) connectToSite(ctx context.Context, user, database string) 
 	// received from the reverse tunnel will be handled by tls.Server.
 	siteConn = tls.Client(siteConn, tlsConfig)
 	return siteConn, nil
+}
+
+// proxyToSite starts proxying all traffic received from Postgres client
+// between this proxy and Teleport database service over reverse tunnel.
+func (s *ProxyServer) proxyToSite(ctx context.Context, clientConn, siteConn io.ReadWriteCloser) (retErr error) {
+	errCh := make(chan error, 2)
+	go func() {
+		defer s.log.Debug("Stop proxying from client to site.")
+		defer siteConn.Close()
+		defer clientConn.Close()
+		_, err := io.Copy(siteConn, clientConn)
+		errCh <- err
+	}()
+	go func() {
+		defer s.log.Debug("Stop proxying from site to client.")
+		defer siteConn.Close()
+		defer clientConn.Close()
+		_, err := io.Copy(clientConn, siteConn)
+		errCh <- err
+	}()
+	var errs []error
+	for i := 0; i < 2; i++ {
+		select {
+		case err := <-errCh:
+			if err != nil && err != io.EOF && !strings.Contains(err.Error(), "use of closed network connection") {
+				s.log.WithError(err).Warn("Connection problem.")
+				errs = append(errs, err)
+			}
+		case <-ctx.Done():
+			return trace.ConnectionProblem(nil, "context is closing")
+		}
+	}
+	return trace.NewAggregate(errs...)
 }
 
 // proxyContext contains parameters for a database session being proxied.

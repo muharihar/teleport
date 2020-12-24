@@ -23,28 +23,27 @@ import (
 	"github.com/gravitational/trace"
 )
 
+// ReadPacket reads a protocol packet from the provided connection.
 //
+// https://dev.mysql.com/doc/internals/en/mysql-packet.html
 func ReadPacket(conn net.Conn) ([]byte, error) {
-	// Read packet header
+	// MySQL protocol packet header is 4 bytes.
 	header := []byte{0, 0, 0, 0}
 	if _, err := io.ReadFull(conn, header); err != nil {
 		return nil, trace.ConvertSystemError(err)
 	}
-
-	// Calculate packet body length
-	bodyLen := int(uint32(header[0]) | uint32(header[1])<<8 | uint32(header[2])<<16)
-
-	// Read packet body
-	body := make([]byte, bodyLen)
-	n, err := io.ReadFull(conn, body)
+	// First 3 bytes is the payload length.
+	payloadLength := int(uint32(header[0]) | uint32(header[1])<<8 | uint32(header[2])<<16)
+	// Read full packet body.
+	payload := make([]byte, payloadLength)
+	n, err := io.ReadFull(conn, payload)
 	if err != nil {
 		return nil, trace.ConvertSystemError(err)
 	}
-
-	return append(header, body[0:n]...), nil
+	return append(header, payload[0:n]...), nil
 }
 
-//
+// WritePacket writes the provided protocol packet to the connection.
 func WritePacket(pkt []byte, conn net.Conn) (int, error) {
 	n, err := conn.Write(pkt)
 	if err != nil {
