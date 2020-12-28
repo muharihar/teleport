@@ -21,7 +21,6 @@ package web
 import (
 	"compress/gzip"
 	"context"
-	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -364,19 +363,16 @@ func NewHandler(cfg Config, opts ...HandlerOption) (*RewritingHandler, error) {
 
 			ctx, err := h.AuthenticateRequest(w, r, false)
 			if err == nil {
-				re, err := NewSessionResponse(ctx, ctx.GetWebSession())
+				resp, err := newSessionResponse(ctx, ctx.getToken())
+				h.log.WithField("resp", resp).Info("New session.")
 				if err == nil {
-					out, err := json.Marshal(re)
+					out, err := json.Marshal(resp)
 					if err == nil {
 						session.Session = base64.StdEncoding.EncodeToString(out)
 					}
 				} else {
 					h.log.WithError(err).Debug("Could not authenticate.")
 				}
-			} else {
-				h.log.WithError(err).Debug("Could not authenticate.")
-				// TODO(dmitri): this looks like a bug and the client should be
-				// notified with an error
 			}
 			httplib.SetIndexHTMLHeaders(w.Header())
 			if err := indexPage.Execute(w, session); err != nil {
@@ -940,7 +936,7 @@ func (h *Handler) githubCallback(w http.ResponseWriter, r *http.Request, p httpr
 			return nil, trace.AccessDenied("access denied")
 		}
 		logger.Infof("Callback is redirecting to web browser.")
-		err = SetSession(w, response.Username, response.Session.GetName())
+		err = SetSessionCookie(w, response.Username, response.Session.GetName())
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
@@ -1022,7 +1018,7 @@ func (h *Handler) oidcCallback(w http.ResponseWriter, r *http.Request, p httprou
 		}
 
 		logger.Info("Callback redirecting to web browser.")
-		if err := SetSession(w, response.Username, response.Session.GetName()); err != nil {
+		if err := SetSessionCookie(w, response.Username, response.Session.GetName()); err != nil {
 			return nil, trace.Wrap(err)
 		}
 		return nil, httplib.SafeRedirect(w, r, response.Req.ClientRedirectURL)
@@ -1157,6 +1153,11 @@ type CreateSessionReq struct {
 	SecondFactorToken string `json:"second_factor_token"`
 }
 
+func (r *CreateSessionResponse) String() string {
+	return fmt.Sprintf("WebSession(type=%v,token=%v,expires=%vs)",
+		r.Type, r.Token, r.ExpiresIn)
+}
+
 // CreateSessionResponse returns OAuth compabible data about
 // access token: https://tools.ietf.org/html/rfc6749
 type CreateSessionResponse struct {
@@ -1168,12 +1169,12 @@ type CreateSessionResponse struct {
 	ExpiresIn int `json:"expires_in"`
 }
 
-func NewSessionResponse(ctx *SessionContext, webSession services.WebSession) (*CreateSessionResponse, error) {
+func newSessionResponse(ctx *SessionContext, token services.WebToken) (*CreateSessionResponse, error) {
 	clt, err := ctx.GetClient()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	user, err := clt.GetUser(webSession.GetUser(), false)
+	user, err := clt.GetUser(token.GetUser(), false)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -1191,9 +1192,10 @@ func NewSessionResponse(ctx *SessionContext, webSession services.WebSession) (*C
 	}
 
 	return &CreateSessionResponse{
-		Type:      roundtrip.AuthBearer,
-		Token:     webSession.GetBearerToken(),
-		ExpiresIn: int(time.Until(webSession.GetBearerTokenExpiryTime()) / time.Second),
+		Type: roundtrip.AuthBearer,
+		// FIXME(dmitri): token accessible as Name for cache
+		Token:     token.GetName(),
+		ExpiresIn: int(time.Until(token.Expiry()) / time.Second),
 	}, nil
 }
 
@@ -1239,12 +1241,15 @@ func (h *Handler) createWebSession(w http.ResponseWriter, r *http.Request, p htt
 	// Block and wait a few seconds for the session that was created to show up
 	// in the cache. If this request is not blocked here, it can get stuck in a
 	// racy session creation loop.
-	err = h.waitForWebSession(r.Context(), webSession.GetName())
+	err = h.waitForWebSession(r.Context(), services.GetWebSessionRequest{
+		User:      req.User,
+		SessionID: webSession.GetName(),
+	})
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 
-	if err := SetSession(w, req.User, webSession.GetName()); err != nil {
+	if err := SetSessionCookie(w, req.User, webSession.GetName()); err != nil {
 		return nil, trace.Wrap(err)
 	}
 
@@ -1254,7 +1259,19 @@ func (h *Handler) createWebSession(w http.ResponseWriter, r *http.Request, p htt
 		return nil, trace.AccessDenied("need auth")
 	}
 
-	return NewSessionResponse(ctx, webSession)
+	resp, err := newSessionResponse(ctx, &services.WebTokenV1{
+		// FIXME(dmitri)
+		Spec: services.WebTokenSpecV1{
+			Token:   webSession.GetBearerToken(),
+			Expires: webSession.GetBearerTokenExpiryTime(),
+		},
+	})
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	h.log.WithField("resp", resp).Info("Create new web session.")
+	return resp, nil
+	// return newSessionResponse(ctx, webSession)
 }
 
 // deleteSession is called to sign out user
@@ -1289,18 +1306,28 @@ func (h *Handler) logout(w http.ResponseWriter, ctx *SessionContext) error {
 func (h *Handler) renewSession(w http.ResponseWriter, r *http.Request, params httprouter.Params, ctx *SessionContext) (interface{}, error) {
 	requestID := params.ByName("requestId")
 
-	newSess, err := ctx.ExtendWebSession(requestID)
+	newSession, err := ctx.ExtendWebSession(requestID)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	newContext, err := ctx.parent.ValidateSession(r.Context(), newSess.GetUser(), newSess.GetName())
+	newContext, err := ctx.validateSession(r.Context(), newSession)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	if err := SetSession(w, newSess.GetUser(), newSess.GetName()); err != nil {
+	// FIXME(dmitri): keep closers in a single value that does not
+	// change (per user)
+	newContext.AddClosers(ctx.transferClosers()...)
+	if err := SetSessionCookie(w, newSession.GetUser(), newSession.GetName()); err != nil {
 		return nil, trace.Wrap(err)
 	}
-	return NewSessionResponse(newContext, newSess)
+	// TODO(dmitri): remove me; debugging
+	resp, err := newSessionResponse(newContext, newContext.getToken())
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	h.log.WithField("resp", resp).Info("Renew web session.")
+	return resp, nil
+	// return newSessionResponse(newContext, newContext.getToken())
 }
 
 func (h *Handler) changePasswordWithToken(w http.ResponseWriter, r *http.Request, p httprouter.Params) (interface{}, error) {
@@ -1317,23 +1344,23 @@ func (h *Handler) changePasswordWithToken(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	if err := SetSession(w, sess.GetUser(), sess.GetName()); err != nil {
+	if err := SetSessionCookie(w, sess.GetUser(), sess.GetName()); err != nil {
 		return nil, trace.Wrap(err)
 	}
 
-	return NewSessionResponse(ctx, sess)
+	return newSessionResponse(ctx, ctx.getToken())
 }
 
 // createResetPasswordToken allows a UI user to reset a user's password.
 // This handler is also required for after creating new users.
 func (h *Handler) createResetPasswordToken(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx *SessionContext) (interface{}, error) {
-	clt, err := ctx.GetClient()
-	if err != nil {
+	var req auth.CreateResetPasswordTokenRequest
+	if err := httplib.ReadJSON(r, &req); err != nil {
 		return nil, trace.Wrap(err)
 	}
 
-	var req auth.CreateResetPasswordTokenRequest
-	if err := httplib.ReadJSON(r, &req); err != nil {
+	clt, err := ctx.GetClient()
+	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 
@@ -1342,7 +1369,6 @@ func (h *Handler) createResetPasswordToken(w http.ResponseWriter, r *http.Reques
 			Name: req.Name,
 			Type: req.Type,
 		})
-
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -1455,14 +1481,14 @@ func (h *Handler) createSessionWithU2FSignResponse(w http.ResponseWriter, r *htt
 	if err != nil {
 		return nil, trace.AccessDenied("bad auth credentials")
 	}
-	if err := SetSession(w, req.User, sess.GetName()); err != nil {
+	if err := SetSessionCookie(w, req.User, sess.GetName()); err != nil {
 		return nil, trace.Wrap(err)
 	}
 	ctx, err := h.auth.NewSession(req.User, sess.GetName())
 	if err != nil {
 		return nil, trace.AccessDenied("need auth")
 	}
-	return NewSessionResponse(ctx, sess)
+	return newSessionResponse(ctx, ctx.getToken())
 }
 
 // getClusters returns a list of cluster and its data.
@@ -1536,7 +1562,7 @@ func (h *Handler) siteNodesGet(w http.ResponseWriter, r *http.Request, p httprou
 		return nil, trace.BadParameter("invalid namespace %q", namespace)
 	}
 
-	// Get a client to the Auth Server with the logged in users identity. The
+	// Get a client to the Auth Server with the logged in user's identity. The
 	// identity of the logged in user is used to fetch the list of nodes.
 	clt, err := ctx.GetUserClient(site)
 	if err != nil {
@@ -1556,7 +1582,7 @@ func (h *Handler) siteNodesGet(w http.ResponseWriter, r *http.Request, p httprou
 // GET /v1/webapi/sites/:site/namespaces/:namespace/connect?access_token=bearer_token&params=<urlencoded json-structure>
 //
 // Due to the nature of websocket we can't POST parameters as is, so we have
-// to add query parameters. The params query parameter is a url encodeed JSON strucrture:
+// to add query parameters. The params query parameter is a URL-encoded JSON structure:
 //
 // {"server_id": "uuid", "login": "admin", "term": {"h": 120, "w": 100}, "sid": "123"}
 //
@@ -1587,7 +1613,7 @@ func (h *Handler) siteNodeConnect(
 	}
 
 	h.log.Debugf("New terminal request for ns=%s, server=%s, login=%s, sid=%s, websid=%s.",
-		req.Namespace, req.Server, req.Login, req.SessionID, ctx.sess.GetName())
+		req.Namespace, req.Server, req.Login, req.SessionID, ctx.GetSessionID())
 
 	authAccessPoint, err := site.CachingAccessPoint()
 	if err != nil {
@@ -2219,6 +2245,7 @@ func (h *Handler) WithAuth(fn ContextHandler) httprouter.Handle {
 func (h *Handler) AuthenticateRequest(w http.ResponseWriter, r *http.Request, checkBearerToken bool) (*SessionContext, error) {
 	const missingCookieMsg = "missing session cookie"
 	logger := h.log.WithField("request", fmt.Sprintf("%v %v", r.Method, r.URL.Path))
+	logger.Info("Request recv.")
 	cookie, err := r.Cookie(CookieName)
 	if err != nil || (cookie != nil && cookie.Value == "") {
 		if err != nil {
@@ -2226,12 +2253,12 @@ func (h *Handler) AuthenticateRequest(w http.ResponseWriter, r *http.Request, ch
 		}
 		return nil, trace.AccessDenied(missingCookieMsg)
 	}
-	d, err := DecodeCookie(cookie.Value)
+	decodedCookie, err := DecodeCookie(cookie.Value)
 	if err != nil {
 		logger.WithError(err).Warn("Failed to decode cookie.")
 		return nil, trace.AccessDenied("failed to decode cookie")
 	}
-	ctx, err := h.auth.ValidateSession(r.Context(), d.User, d.SID)
+	ctx, err := h.auth.ValidateSession(r.Context(), decodedCookie.User, decodedCookie.SID)
 	if err != nil {
 		logger.WithError(err).Warn("Invalid session.")
 		ClearSession(w)
@@ -2243,10 +2270,9 @@ func (h *Handler) AuthenticateRequest(w http.ResponseWriter, r *http.Request, ch
 			logger.WithError(err).Warn("No auth headers.")
 			return nil, trace.AccessDenied("need auth")
 		}
-
-		if subtle.ConstantTimeCompare([]byte(creds.Password), []byte(ctx.GetWebSession().GetBearerToken())) != 1 {
+		if err := ctx.validateBearerToken(creds.Password); err != nil {
 			logger.Warn("Request failed: bad bearer token.")
-			return nil, trace.AccessDenied("bad bearer token")
+			return nil, trace.Wrap(err)
 		}
 	}
 	return ctx, nil

@@ -54,8 +54,11 @@ type WebSession interface {
 	// BearerToken is a special bearer token used for additional
 	// bearer authentication
 	GetBearerToken() string
+
+	// FIXME(dmitri): remove
 	// SetBearerTokenExpiryTime sets bearer token expiry time
-	SetBearerTokenExpiryTime(time.Time)
+	// SetBearerTokenExpiryTime(time.Time)
+
 	// SetExpiryTime sets session expiry time
 	SetExpiryTime(time.Time)
 	// GetBearerTokenExpiryTime - absolute time when token expires
@@ -157,7 +160,8 @@ func (ws *WebSessionV2) CheckAndSetDefaults() error {
 
 // String returns string representation of the session.
 func (ws *WebSessionV2) String() string {
-	return fmt.Sprintf("WebSession(kind=%v,name=%v,id=%v)", ws.GetKind(), ws.GetUser(), ws.GetName())
+	return fmt.Sprintf("WebSession(kind=%v,user=%v,id=%v,ttl=%v)",
+		ws.GetKind(), ws.GetUser(), ws.GetName(), ws.GetExpiryTime())
 }
 
 // SetUser sets user associated with this session
@@ -204,10 +208,12 @@ func (ws *WebSessionV2) GetBearerToken() string {
 	return ws.Spec.BearerToken
 }
 
+/*
 // SetBearerTokenExpiryTime sets bearer token expiry time
 func (ws *WebSessionV2) SetBearerTokenExpiryTime(tm time.Time) {
 	ws.Spec.BearerTokenExpires = tm
 }
+*/
 
 // SetExpiryTime sets session expiry time
 func (ws *WebSessionV2) SetExpiryTime(tm time.Time) {
@@ -560,15 +566,6 @@ type DeleteAppSessionRequest struct {
 	SessionID string `json:"session_id"`
 }
 
-// GetWebSessionRequest contains the parameters to request a regular
-// web session.
-type GetWebSessionRequest struct {
-	// User specifies the user to query the session for
-	User string
-	// SessionID is the session ID to request
-	SessionID string
-}
-
 // Check validates the request.
 func (r *GetWebSessionRequest) Check() error {
 	if r.User == "" {
@@ -580,17 +577,197 @@ func (r *GetWebSessionRequest) Check() error {
 	return nil
 }
 
-// DeleteWebSessionRequest contains the parameters to delete a regular
-// web session.
-type DeleteWebSessionRequest struct {
-	// SessionID is the session ID to request
-	SessionID string
-}
-
 // Check validates the request.
 func (r *DeleteWebSessionRequest) Check() error {
 	if r.SessionID == "" {
 		return trace.BadParameter("session ID missing")
+	}
+	return nil
+}
+
+// WebToken is a time-limited unique token bound to a user's session
+type WebToken interface {
+	// Resource represents common properties for all resources.
+	Resource
+
+	// CheckAndSetDefaults checks and set default values for any missing fields.
+	CheckAndSetDefaults() error
+	GetToken() string
+	SetToken(token string)
+	GetUser() string
+	SetUser(user string)
+	String() string
+
+	V1() *WebTokenV1
+}
+
+var _ WebToken = &WebTokenV1{}
+
+func (r *WebTokenV1) GetMetadata() Metadata {
+	return r.Metadata
+}
+
+func (r *WebTokenV1) GetKind() string {
+	return r.Kind
+}
+
+func (r *WebTokenV1) GetSubKind() string {
+	return r.SubKind
+}
+
+func (r *WebTokenV1) SetSubKind(subKind string) {
+	r.SubKind = subKind
+}
+
+func (r *WebTokenV1) GetVersion() string {
+	return r.Version
+}
+
+func (r *WebTokenV1) GetName() string {
+	return r.Metadata.Name
+}
+
+func (r *WebTokenV1) SetName(name string) {
+	r.Metadata.Name = name
+}
+
+func (r *WebTokenV1) GetResourceID() int64 {
+	return r.Metadata.GetID()
+}
+
+func (r *WebTokenV1) SetResourceID(id int64) {
+	r.Metadata.SetID(id)
+}
+
+func (r *WebTokenV1) SetTTL(clock clockwork.Clock, ttl time.Duration) {
+	r.Metadata.SetTTL(clock, ttl)
+}
+
+func (r *WebTokenV1) GetToken() string {
+	return r.Spec.Token
+}
+
+func (r *WebTokenV1) SetToken(token string) {
+	r.Spec.Token = token
+}
+
+func (r *WebTokenV1) GetUser() string {
+	return r.Spec.User
+}
+
+func (r *WebTokenV1) SetUser(user string) {
+	r.Spec.User = user
+}
+
+func (r *WebTokenV1) Expiry() time.Time {
+	return r.Spec.Expires
+}
+
+func (r *WebTokenV1) SetExpiry(t time.Time) {
+	r.Spec.Expires = t
+}
+
+func (r *WebTokenV1) CheckAndSetDefaults() error {
+	return r.Metadata.CheckAndSetDefaults()
+}
+
+// V1 returns the V1 version of this token.
+func (r *WebTokenV1) V1() *WebTokenV1 {
+	return r
+}
+
+// String returns string representation of the token.
+func (r *WebTokenV1) String() string {
+	return fmt.Sprintf("WebToken(kind=%v,user=%v,token=%v,ttl=%v)",
+		r.GetKind(), r.GetUser(), r.GetToken(), r.Expiry())
+}
+
+// MarshalWebToken serializes the web token as JSON-encoded payload
+func MarshalWebToken(token WebToken, opts ...MarshalOption) ([]byte, error) {
+	cfg, err := collectOptions(opts)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	type tokenV1 interface {
+		V1() *WebTokenV1
+	}
+	version := cfg.GetVersion()
+	switch version {
+	case V1:
+		value, ok := token.(tokenV1)
+		if !ok {
+			return nil, trace.BadParameter("don't know how to marshal session %v", V1)
+		}
+		return json.Marshal(value.V1())
+	default:
+		return nil, trace.BadParameter("version %v is not supported", version)
+	}
+}
+
+// UnmarshalWebToken interprets web token from on-disk byte format
+func UnmarshalWebToken(bytes []byte, opts ...MarshalOption) (WebToken, error) {
+	config, err := collectOptions(opts)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	var hdr ResourceHeader
+	err = json.Unmarshal(bytes, &hdr)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	switch hdr.Version {
+	case V1:
+		var token WebTokenV1
+		if err := utils.UnmarshalWithSchema(GetWebTokenSchema(), &token, bytes); err != nil {
+			return nil, trace.BadParameter("invalid web token: %v", err.Error())
+		}
+		utils.UTC(&token.Spec.Expires)
+		if err := token.CheckAndSetDefaults(); err != nil {
+			return nil, trace.Wrap(err)
+		}
+		if config.ID != 0 {
+			token.SetResourceID(config.ID)
+		}
+		if !config.Expires.IsZero() {
+			token.SetExpiry(config.Expires)
+		}
+		return &token, nil
+	}
+	return nil, trace.BadParameter("web token resource version %v is not supported", hdr.Version)
+}
+
+// GetWebTokenSchema returns JSON schema for the web token resource
+func GetWebTokenSchema() string {
+	return WebTokenSpecV1Schema
+}
+
+// WebTokenSpecV1Schema is JSON schema for cert authority V2
+const WebTokenSpecV1Schema = `{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["token", "user", "expires"],
+  "properties": {
+    "user": {"type": "string"},
+    "token": {"type": "string"},
+    "expires": {"type": "string"}
+  }
+}`
+
+// Check validates the request.
+func (r *GetWebTokenRequest) Check() error {
+	if r.User == "" {
+		return trace.BadParameter("user name missing")
+	}
+	if r.Token == "" {
+		return trace.BadParameter("token missing")
+	}
+	return nil
+}
+
+// Check validates the request.
+func (r *DeleteWebTokenRequest) Check() error {
+	if r.Token == "" {
+		return trace.BadParameter("token missing")
 	}
 	return nil
 }

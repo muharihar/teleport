@@ -313,7 +313,7 @@ const UserSpecV2SchemaTemplate = `{
     },
     "status": %v,
     "created_by": %v,
-	"local_auth": %v%v
+    "local_auth": %v%v
   }
 }`
 
