@@ -585,6 +585,19 @@ func (r *DeleteWebSessionRequest) Check() error {
 	return nil
 }
 
+// NewWebToken returns a new web token with the given value and spec
+func NewWebToken(token string, spec WebTokenSpecV1) WebToken {
+	return &WebTokenV1{
+		Kind:    KindWebToken,
+		Version: V1,
+		Metadata: Metadata{
+			Name:      token,
+			Namespace: defaults.Namespace,
+		},
+		Spec: spec,
+	}
+}
+
 // WebToken is a time-limited unique token bound to a user's session
 type WebToken interface {
 	// Resource represents common properties for all resources.
@@ -770,4 +783,28 @@ func (r *DeleteWebTokenRequest) Check() error {
 		return trace.BadParameter("token missing")
 	}
 	return nil
+}
+
+// CheckAndSetDefaults validates the request and sets defaults.
+func (r *NewWebSessionRequest) CheckAndSetDefaults() error {
+	if r.User == "" {
+		return trace.BadParameter("user name is required")
+	}
+	if len(r.Roles) == 0 {
+		return trace.BadParameter("roles are required")
+	}
+	if len(r.Traits) == 0 {
+		return trace.BadParameter("traits are required")
+	}
+	if r.SessionTTL == 0 {
+		r.SessionTTL = defaults.CertDuration
+	}
+	return nil
+}
+
+type NewWebSessionRequest struct {
+	User       string
+	Roles      []string
+	Traits     map[string][]string
+	SessionTTL time.Duration
 }

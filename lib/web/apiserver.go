@@ -363,7 +363,7 @@ func NewHandler(cfg Config, opts ...HandlerOption) (*RewritingHandler, error) {
 
 			ctx, err := h.AuthenticateRequest(w, r, false)
 			if err == nil {
-				resp, err := newSessionResponse(ctx, ctx.getToken())
+				resp, err := newSessionResponse(ctx)
 				h.log.WithField("resp", resp).Info("New session.")
 				if err == nil {
 					out, err := json.Marshal(resp)
@@ -1169,11 +1169,12 @@ type CreateSessionResponse struct {
 	ExpiresIn int `json:"expires_in"`
 }
 
-func newSessionResponse(ctx *SessionContext, token services.WebToken) (*CreateSessionResponse, error) {
+func newSessionResponse(ctx *SessionContext) (*CreateSessionResponse, error) {
 	clt, err := ctx.GetClient()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
+	token := ctx.getToken()
 	user, err := clt.GetUser(token.GetUser(), false)
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -1190,10 +1191,8 @@ func newSessionResponse(ctx *SessionContext, token services.WebToken) (*CreateSe
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-
 	return &CreateSessionResponse{
-		Type: roundtrip.AuthBearer,
-		// FIXME(dmitri): token accessible as Name for cache
+		Type:      roundtrip.AuthBearer,
 		Token:     token.GetName(),
 		ExpiresIn: int(time.Until(token.Expiry()) / time.Second),
 	}, nil
@@ -1253,19 +1252,13 @@ func (h *Handler) createWebSession(w http.ResponseWriter, r *http.Request, p htt
 		return nil, trace.Wrap(err)
 	}
 
-	ctx, err := h.auth.NewSession(req.User, webSession.GetName())
+	ctx, err := h.auth.newSessionContext(req.User, webSession.GetName())
 	if err != nil {
 		h.log.WithError(err).Warnf("Access attempt denied for user %q.", req.User)
 		return nil, trace.AccessDenied("need auth")
 	}
 
-	resp, err := newSessionResponse(ctx, &services.WebTokenV1{
-		// FIXME(dmitri)
-		Spec: services.WebTokenSpecV1{
-			Token:   webSession.GetBearerToken(),
-			Expires: webSession.GetBearerTokenExpiryTime(),
-		},
-	})
+	resp, err := newSessionResponse(ctx)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -1306,7 +1299,7 @@ func (h *Handler) logout(w http.ResponseWriter, ctx *SessionContext) error {
 func (h *Handler) renewSession(w http.ResponseWriter, r *http.Request, params httprouter.Params, ctx *SessionContext) (interface{}, error) {
 	requestID := params.ByName("requestId")
 
-	newSession, err := ctx.ExtendWebSession(requestID)
+	newSession, err := ctx.extendWebSession(requestID)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -1314,14 +1307,11 @@ func (h *Handler) renewSession(w http.ResponseWriter, r *http.Request, params ht
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	// FIXME(dmitri): keep closers in a single value that does not
-	// change (per user)
-	newContext.AddClosers(ctx.transferClosers()...)
 	if err := SetSessionCookie(w, newSession.GetUser(), newSession.GetName()); err != nil {
 		return nil, trace.Wrap(err)
 	}
 	// TODO(dmitri): remove me; debugging
-	resp, err := newSessionResponse(newContext, newContext.getToken())
+	resp, err := newSessionResponse(newContext)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -1340,7 +1330,7 @@ func (h *Handler) changePasswordWithToken(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	ctx, err := h.auth.NewSession(sess.GetUser(), sess.GetName())
+	ctx, err := h.auth.newSessionContext(sess.GetUser(), sess.GetName())
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -1348,7 +1338,7 @@ func (h *Handler) changePasswordWithToken(w http.ResponseWriter, r *http.Request
 		return nil, trace.Wrap(err)
 	}
 
-	return newSessionResponse(ctx, ctx.getToken())
+	return newSessionResponse(ctx)
 }
 
 // createResetPasswordToken allows a UI user to reset a user's password.
@@ -1484,11 +1474,11 @@ func (h *Handler) createSessionWithU2FSignResponse(w http.ResponseWriter, r *htt
 	if err := SetSessionCookie(w, req.User, sess.GetName()); err != nil {
 		return nil, trace.Wrap(err)
 	}
-	ctx, err := h.auth.NewSession(req.User, sess.GetName())
+	ctx, err := h.auth.newSessionContext(req.User, sess.GetName())
 	if err != nil {
 		return nil, trace.AccessDenied("need auth")
 	}
-	return newSessionResponse(ctx, ctx.getToken())
+	return newSessionResponse(ctx)
 }
 
 // getClusters returns a list of cluster and its data.
@@ -2258,7 +2248,7 @@ func (h *Handler) AuthenticateRequest(w http.ResponseWriter, r *http.Request, ch
 		logger.WithError(err).Warn("Failed to decode cookie.")
 		return nil, trace.AccessDenied("failed to decode cookie")
 	}
-	ctx, err := h.auth.ValidateSession(r.Context(), decodedCookie.User, decodedCookie.SID)
+	ctx, err := h.auth.validateSession(r.Context(), decodedCookie.User, decodedCookie.SID)
 	if err != nil {
 		logger.WithError(err).Warn("Invalid session.")
 		ClearSession(w)
@@ -2270,7 +2260,7 @@ func (h *Handler) AuthenticateRequest(w http.ResponseWriter, r *http.Request, ch
 			logger.WithError(err).Warn("No auth headers.")
 			return nil, trace.AccessDenied("need auth")
 		}
-		if err := ctx.validateBearerToken(creds.Password); err != nil {
+		if err := ctx.validateBearerToken(r.Context(), creds.Password); err != nil {
 			logger.Warn("Request failed: bad bearer token.")
 			return nil, trace.Wrap(err)
 		}
