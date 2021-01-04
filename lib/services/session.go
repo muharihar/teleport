@@ -802,9 +802,16 @@ func (r *NewWebSessionRequest) CheckAndSetDefaults() error {
 	return nil
 }
 
+// NewWebSessionRequest defines a request to create a new user
+// web session
 type NewWebSessionRequest struct {
-	User       string
-	Roles      []string
-	Traits     map[string][]string
+	// User specifies the user this session is bound to
+	User string
+	// Roles optionally lists additional user roles
+	Roles []string
+	// Traits optionally lists role traits
+	Traits map[string][]string
+	// SessionTTL optionally specifies the session time-to-live.
+	// If left unspecified, default certification duration is used.
 	SessionTTL time.Duration
 }
