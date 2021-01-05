@@ -54,11 +54,6 @@ type WebSession interface {
 	// BearerToken is a special bearer token used for additional
 	// bearer authentication
 	GetBearerToken() string
-
-	// FIXME(dmitri): remove
-	// SetBearerTokenExpiryTime sets bearer token expiry time
-	// SetBearerTokenExpiryTime(time.Time)
-
 	// SetExpiryTime sets session expiry time
 	SetExpiryTime(time.Time)
 	// GetBearerTokenExpiryTime - absolute time when token expires
@@ -209,13 +204,6 @@ func (ws *WebSessionV2) SetPriv(priv []byte) {
 func (ws *WebSessionV2) GetBearerToken() string {
 	return ws.Spec.BearerToken
 }
-
-/*
-// SetBearerTokenExpiryTime sets bearer token expiry time
-func (ws *WebSessionV2) SetBearerTokenExpiryTime(tm time.Time) {
-	ws.Spec.BearerTokenExpires = tm
-}
-*/
 
 // SetExpiryTime sets session expiry time
 func (ws *WebSessionV2) SetExpiryTime(tm time.Time) {
@@ -370,11 +358,6 @@ func (ws *WebSessionV1) SetExpiryTime(tm time.Time) {
 // GetBearerRoken - absolute time when token expires
 func (ws *WebSessionV1) GetBearerTokenExpiryTime() time.Time {
 	return ws.Expires
-}
-
-// SetBearerTokenExpiryTime sets session expiry time
-func (ws *WebSessionV1) SetBearerTokenExpiryTime(tm time.Time) {
-	ws.Expires = tm
 }
 
 var webSessionMarshaler WebSessionMarshaler = &TeleportWebSessionMarshaler{}
@@ -609,10 +592,15 @@ type WebToken interface {
 
 	// CheckAndSetDefaults checks and set default values for any missing fields.
 	CheckAndSetDefaults() error
+	// GetToken returns the token value
 	GetToken() string
+	// SetToken sets the token value
 	SetToken(token string)
+	// GetUser returns the user the token is bound to
 	GetUser() string
+	// SetUser sets the user the token is bound to
 	SetUser(user string)
+	// String returns the text representation of this token
 	String() string
 
 	V1() *WebTokenV1
@@ -620,70 +608,87 @@ type WebToken interface {
 
 var _ WebToken = &WebTokenV1{}
 
+// GetMetadata returns the token metadata
 func (r *WebTokenV1) GetMetadata() Metadata {
 	return r.Metadata
 }
 
+// GetKind returns the token resource kind
 func (r *WebTokenV1) GetKind() string {
 	return r.Kind
 }
 
+// GetSubKind returns the token resource subkind
 func (r *WebTokenV1) GetSubKind() string {
 	return r.SubKind
 }
 
+// SetSubKind sets the token resource subkind
 func (r *WebTokenV1) SetSubKind(subKind string) {
 	r.SubKind = subKind
 }
 
+// GetVersion returns the token resource version
 func (r *WebTokenV1) GetVersion() string {
 	return r.Version
 }
 
+// GetName returns the token value
 func (r *WebTokenV1) GetName() string {
 	return r.Metadata.Name
 }
 
+// SetName sets the token value
 func (r *WebTokenV1) SetName(name string) {
 	r.Metadata.Name = name
 }
 
+// GetResourceID returns the token resource ID
 func (r *WebTokenV1) GetResourceID() int64 {
 	return r.Metadata.GetID()
 }
 
+// SetResourceID sets the token resource ID
 func (r *WebTokenV1) SetResourceID(id int64) {
 	r.Metadata.SetID(id)
 }
 
+// SetTTL sets the token resource TTL (time-to-live) value
 func (r *WebTokenV1) SetTTL(clock clockwork.Clock, ttl time.Duration) {
 	r.Metadata.SetTTL(clock, ttl)
 }
 
+// GetToken returns the token value
 func (r *WebTokenV1) GetToken() string {
 	return r.Spec.Token
 }
 
+// SetToken sets the token value
 func (r *WebTokenV1) SetToken(token string) {
 	r.Spec.Token = token
 }
 
+// GetUser returns the user this token is bound to
 func (r *WebTokenV1) GetUser() string {
 	return r.Spec.User
 }
 
+// SetUser sets the user this token is bound to
 func (r *WebTokenV1) SetUser(user string) {
 	r.Spec.User = user
 }
 
+// Expiry returns the token absolute expiration time
 func (r *WebTokenV1) Expiry() time.Time {
 	return r.Spec.Expires
 }
 
+// SetExpiry sets the token absolute expiration time
 func (r *WebTokenV1) SetExpiry(t time.Time) {
 	r.Spec.Expires = t
 }
 
+// CheckAndSetDefaults validates this token value and sets defaults
 func (r *WebTokenV1) CheckAndSetDefaults() error {
 	return r.Metadata.CheckAndSetDefaults()
 }
