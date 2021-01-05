@@ -576,11 +576,13 @@ func (c *Client) CreateAppSession(ctx context.Context, req services.CreateAppSes
 	if err != nil {
 		return nil, trail.FromGRPC(err)
 	}
+
 	return resp.GetSession(), nil
 }
 
 // DeleteAppSession removes an application web session.
 func (c *Client) DeleteAppSession(ctx context.Context, req services.DeleteAppSessionRequest) error {
+
 	_, err := c.grpc.DeleteAppSession(ctx, &proto.DeleteAppSessionRequest{
 		SessionID: req.SessionID,
 	})
@@ -604,6 +606,7 @@ func (c *Client) GenerateAppToken(ctx context.Context, req jwt.GenerateAppTokenR
 	if err != nil {
 		return "", trail.FromGRPC(err)
 	}
+
 	return resp.GetToken(), nil
 }
 

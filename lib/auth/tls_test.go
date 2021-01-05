@@ -924,6 +924,7 @@ func (s *TLSSuite) TestTunnelConnectionsCRUD(c *check.C) {
 
 	suite := &suite.ServicesTestSuite{
 		PresenceS: clt,
+		Clock:     clockwork.NewFakeClock(),
 	}
 	suite.TunnelConnectionsCRUD(c)
 }

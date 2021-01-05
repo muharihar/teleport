@@ -81,7 +81,7 @@ type WebSession interface {
 
 // NewWebSession returns new instance of the web session based on the V2 spec
 func NewWebSession(name string, kind string, subkind string, spec WebSessionSpecV2) WebSession {
-	return &WebSessionV2{
+	session := &WebSessionV2{
 		Kind:    kind,
 		SubKind: subkind,
 		Version: V2,
@@ -91,6 +91,8 @@ func NewWebSession(name string, kind string, subkind string, spec WebSessionSpec
 		},
 		Spec: spec,
 	}
+	session.Metadata.SetExpiry(spec.Expires)
+	return session
 }
 
 func (ws *WebSessionV2) GetKind() string {
@@ -160,7 +162,7 @@ func (ws *WebSessionV2) CheckAndSetDefaults() error {
 
 // String returns string representation of the session.
 func (ws *WebSessionV2) String() string {
-	return fmt.Sprintf("WebSession(kind=%v,user=%v,id=%v,ttl=%v)",
+	return fmt.Sprintf("WebSession(kind=%v,user=%v,id=%v,expires=%v)",
 		ws.GetKind(), ws.GetUser(), ws.GetName(), ws.GetExpiryTime())
 }
 
@@ -586,16 +588,18 @@ func (r *DeleteWebSessionRequest) Check() error {
 }
 
 // NewWebToken returns a new web token with the given value and spec
-func NewWebToken(token string, spec WebTokenSpecV1) WebToken {
-	return &WebTokenV1{
+func NewWebToken(spec WebTokenSpecV1) WebToken {
+	token := &WebTokenV1{
 		Kind:    KindWebToken,
 		Version: V1,
 		Metadata: Metadata{
-			Name:      token,
+			Name:      spec.Token,
 			Namespace: defaults.Namespace,
 		},
 		Spec: spec,
 	}
+	token.Metadata.SetExpiry(spec.Expires)
+	return token
 }
 
 // WebToken is a time-limited unique token bound to a user's session
@@ -691,7 +695,7 @@ func (r *WebTokenV1) V1() *WebTokenV1 {
 
 // String returns string representation of the token.
 func (r *WebTokenV1) String() string {
-	return fmt.Sprintf("WebToken(kind=%v,user=%v,token=%v,ttl=%v)",
+	return fmt.Sprintf("WebToken(kind=%v,user=%v,token=%v,expires=%v)",
 		r.GetKind(), r.GetUser(), r.GetToken(), r.Expiry())
 }
 
@@ -711,7 +715,15 @@ func MarshalWebToken(token WebToken, opts ...MarshalOption) ([]byte, error) {
 		if !ok {
 			return nil, trace.BadParameter("don't know how to marshal session %v", V1)
 		}
-		return json.Marshal(value.V1())
+		v1 := value.V1()
+		if !cfg.PreserveResourceID {
+			// avoid modifying the original object
+			// to prevent unexpected data races
+			copy := *v1
+			copy.Metadata.ID = 0
+			v1 = &copy
+		}
+		return utils.FastMarshal(v1)
 	default:
 		return nil, trace.BadParameter("version %v is not supported", version)
 	}
@@ -742,7 +754,7 @@ func UnmarshalWebToken(bytes []byte, opts ...MarshalOption) (WebToken, error) {
 			token.SetResourceID(config.ID)
 		}
 		if !config.Expires.IsZero() {
-			token.SetExpiry(config.Expires)
+			token.Metadata.SetExpiry(config.Expires)
 		}
 		return &token, nil
 	}
@@ -751,7 +763,7 @@ func UnmarshalWebToken(bytes []byte, opts ...MarshalOption) (WebToken, error) {
 
 // GetWebTokenSchema returns JSON schema for the web token resource
 func GetWebTokenSchema() string {
-	return WebTokenSpecV1Schema
+	return fmt.Sprintf(V2SchemaTemplate, MetadataSchema, WebTokenSpecV1Schema, "")
 }
 
 // WebTokenSpecV1Schema is JSON schema for cert authority V2

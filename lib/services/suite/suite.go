@@ -528,12 +528,12 @@ func (s *ServicesTestSuite) WebSessionCRUD(c *check.C) {
 	_, err := s.WebS.GetWebSession("user1", "sid1")
 	c.Assert(trace.IsNotFound(err), check.Equals, true, check.Commentf("%#v", err))
 
-	dt := time.Date(2015, 6, 5, 4, 3, 2, 1, time.UTC).UTC()
+	expires := s.Clock.Now().Add(1 * time.Minute)
 	ws := services.NewWebSession("sid1", services.KindWebSession, services.KindWebSession,
 		services.WebSessionSpecV2{
 			Pub:     []byte("pub123"),
 			Priv:    []byte("priv123"),
-			Expires: dt,
+			Expires: expires,
 		})
 	err = s.WebS.UpsertWebSession("user1", "sid1", ws)
 	c.Assert(err, check.IsNil)
@@ -546,7 +546,7 @@ func (s *ServicesTestSuite) WebSessionCRUD(c *check.C) {
 		services.WebSessionSpecV2{
 			Pub:     []byte("pub321"),
 			Priv:    []byte("priv321"),
-			Expires: dt,
+			Expires: expires,
 		})
 	err = s.WebS.UpsertWebSession("user1", "sid1", ws1)
 	c.Assert(err, check.IsNil)
@@ -575,7 +575,7 @@ func (s *ServicesTestSuite) TokenCRUD(c *check.C) {
 	c.Assert(token.GetRoles().Include(teleport.RoleAuth), check.Equals, true)
 	c.Assert(token.GetRoles().Include(teleport.RoleNode), check.Equals, true)
 	c.Assert(token.GetRoles().Include(teleport.RoleProxy), check.Equals, false)
-	diff := time.Now().UTC().Add(defaults.ProvisioningTokenTTL).Second() - token.Expiry().Second()
+	diff := s.Clock.Now().UTC().Add(defaults.ProvisioningTokenTTL).Second() - token.Expiry().Second()
 	if diff > 1 {
 		c.Fatalf("expected diff to be within one second, got %v instead", diff)
 	}
@@ -823,7 +823,7 @@ func (s *ServicesTestSuite) TunnelConnectionsCRUD(c *check.C) {
 	c.Assert(err, check.IsNil)
 	c.Assert(len(out), check.Equals, 0)
 
-	dt := time.Date(2015, 6, 5, 4, 3, 2, 1, time.UTC).UTC()
+	dt := s.Clock.Now()
 	conn, err := services.NewTunnelConnection("conn1", services.TunnelConnectionSpecV2{
 		ClusterName:   clusterName,
 		ProxyName:     "p1",
