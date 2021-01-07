@@ -412,8 +412,6 @@ type (
 
 var (
 	NewSAMLConnector          = types.NewSAMLConnector
-	GetAttributeNames         = types.GetAttributeNames
-	SAMLAssertionsToTraits    = types.SAMLAssertionsToTraits
 	SetSAMLConnectorMarshaler = types.SetSAMLConnectorMarshaler
 	GetSAMLConnectorMarshaler = types.GetSAMLConnectorMarshaler
 )
