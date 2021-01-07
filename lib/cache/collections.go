@@ -20,7 +20,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/gravitational/teleport/lib/backend"
+	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/services"
 
@@ -180,7 +180,7 @@ func (r *accessRequest) fetch(ctx context.Context) (apply func(ctx context.Conte
 
 func (r *accessRequest) processEvent(ctx context.Context, event services.Event) error {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		err := r.dynamicAccessCache.DeleteAccessRequest(ctx, event.Resource.GetName())
 		if err != nil {
 			// resource could be missing in the cache
@@ -191,7 +191,7 @@ func (r *accessRequest) processEvent(ctx context.Context, event services.Event) 
 				return trace.Wrap(err)
 			}
 		}
-	case backend.OpPut:
+	case types.OpPut:
 		resource, ok := event.Resource.(*services.AccessRequestV3)
 		if !ok {
 			return trace.BadParameter("unexpected type %T", event.Resource)
@@ -245,7 +245,7 @@ func (c *tunnelConnection) fetch(ctx context.Context) (apply func(ctx context.Co
 
 func (c *tunnelConnection) processEvent(ctx context.Context, event services.Event) error {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		err := c.presenceCache.DeleteTunnelConnection(event.Resource.GetSubKind(), event.Resource.GetName())
 		if err != nil {
 			// resource could be missing in the cache
@@ -256,7 +256,7 @@ func (c *tunnelConnection) processEvent(ctx context.Context, event services.Even
 				return trace.Wrap(err)
 			}
 		}
-	case backend.OpPut:
+	case types.OpPut:
 		resource, ok := event.Resource.(services.TunnelConnection)
 		if !ok {
 			return trace.BadParameter("unexpected type %T", event.Resource)
@@ -310,7 +310,7 @@ func (c *remoteCluster) fetch(ctx context.Context) (apply func(ctx context.Conte
 
 func (c *remoteCluster) processEvent(ctx context.Context, event services.Event) error {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		err := c.presenceCache.DeleteRemoteCluster(event.Resource.GetName())
 		if err != nil {
 			// resource could be missing in the cache
@@ -321,7 +321,7 @@ func (c *remoteCluster) processEvent(ctx context.Context, event services.Event) 
 				return trace.Wrap(err)
 			}
 		}
-	case backend.OpPut:
+	case types.OpPut:
 		resource, ok := event.Resource.(services.RemoteCluster)
 		if !ok {
 			return trace.BadParameter("unexpected type %T", event.Resource)
@@ -383,7 +383,7 @@ func (c *reverseTunnel) fetch(ctx context.Context) (apply func(ctx context.Conte
 
 func (c *reverseTunnel) processEvent(ctx context.Context, event services.Event) error {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		err := c.presenceCache.DeleteReverseTunnel(event.Resource.GetName())
 		if err != nil {
 			// resource could be missing in the cache
@@ -394,7 +394,7 @@ func (c *reverseTunnel) processEvent(ctx context.Context, event services.Event) 
 				return trace.Wrap(err)
 			}
 		}
-	case backend.OpPut:
+	case types.OpPut:
 		resource, ok := event.Resource.(services.ReverseTunnel)
 		if !ok {
 			return trace.BadParameter("unexpected type %T", event.Resource)
@@ -451,7 +451,7 @@ func (c *proxy) fetch(ctx context.Context) (apply func(ctx context.Context) erro
 
 func (c *proxy) processEvent(ctx context.Context, event services.Event) error {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		err := c.presenceCache.DeleteProxy(event.Resource.GetName())
 		if err != nil {
 			// resource could be missing in the cache
@@ -462,7 +462,7 @@ func (c *proxy) processEvent(ctx context.Context, event services.Event) error {
 				return trace.Wrap(err)
 			}
 		}
-	case backend.OpPut:
+	case types.OpPut:
 		resource, ok := event.Resource.(services.Server)
 		if !ok {
 			return trace.BadParameter("unexpected type %T", event.Resource)
@@ -519,7 +519,7 @@ func (c *authServer) fetch(ctx context.Context) (apply func(ctx context.Context)
 
 func (c *authServer) processEvent(ctx context.Context, event services.Event) error {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		err := c.presenceCache.DeleteAuthServer(event.Resource.GetName())
 		if err != nil {
 			// resource could be missing in the cache
@@ -530,7 +530,7 @@ func (c *authServer) processEvent(ctx context.Context, event services.Event) err
 				return trace.Wrap(err)
 			}
 		}
-	case backend.OpPut:
+	case types.OpPut:
 		resource, ok := event.Resource.(services.Server)
 		if !ok {
 			return trace.BadParameter("unexpected type %T", event.Resource)
@@ -585,7 +585,7 @@ func (c *node) fetch(ctx context.Context) (apply func(ctx context.Context) error
 
 func (c *node) processEvent(ctx context.Context, event services.Event) error {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		err := c.presenceCache.DeleteNode(event.Resource.GetMetadata().Namespace, event.Resource.GetName())
 		if err != nil {
 			// resource could be missing in the cache
@@ -596,7 +596,7 @@ func (c *node) processEvent(ctx context.Context, event services.Event) error {
 				return trace.Wrap(err)
 			}
 		}
-	case backend.OpPut:
+	case types.OpPut:
 		resource, ok := event.Resource.(services.Server)
 		if !ok {
 			return trace.BadParameter("unexpected type %T", event.Resource)
@@ -651,7 +651,7 @@ func (c *namespace) fetch(ctx context.Context) (apply func(ctx context.Context) 
 
 func (c *namespace) processEvent(ctx context.Context, event services.Event) error {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		err := c.presenceCache.DeleteNamespace(event.Resource.GetName())
 		if err != nil {
 			// resource could be missing in the cache
@@ -662,7 +662,7 @@ func (c *namespace) processEvent(ctx context.Context, event services.Event) erro
 				return trace.Wrap(err)
 			}
 		}
-	case backend.OpPut:
+	case types.OpPut:
 		resource, ok := event.Resource.(*services.Namespace)
 		if !ok {
 			return trace.BadParameter("unexpected type %T", event.Resource)
@@ -762,7 +762,7 @@ func (c *certAuthority) fetchCertAuthorities(caType services.CertAuthType) (appl
 
 func (c *certAuthority) processEvent(ctx context.Context, event services.Event) error {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		err := c.trustCache.DeleteCertAuthority(services.CertAuthID{
 			Type:       services.CertAuthType(event.Resource.GetSubKind()),
 			DomainName: event.Resource.GetName(),
@@ -776,7 +776,7 @@ func (c *certAuthority) processEvent(ctx context.Context, event services.Event) 
 				return trace.Wrap(err)
 			}
 		}
-	case backend.OpPut:
+	case types.OpPut:
 		resource, ok := event.Resource.(services.CertAuthority)
 		if !ok {
 			return trace.BadParameter("unexpected type %T", event.Resource)
@@ -840,7 +840,7 @@ func (c *staticTokens) fetch(ctx context.Context) (apply func(ctx context.Contex
 
 func (c *staticTokens) processEvent(ctx context.Context, event services.Event) error {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		err := c.clusterConfigCache.DeleteStaticTokens()
 		if err != nil {
 			// resource could be missing in the cache
@@ -851,7 +851,7 @@ func (c *staticTokens) processEvent(ctx context.Context, event services.Event) e
 				return trace.Wrap(err)
 			}
 		}
-	case backend.OpPut:
+	case types.OpPut:
 		resource, ok := event.Resource.(services.StaticTokens)
 		if !ok {
 			return trace.BadParameter("unexpected type %T", event.Resource)
@@ -906,7 +906,7 @@ func (c *provisionToken) fetch(ctx context.Context) (apply func(ctx context.Cont
 
 func (c *provisionToken) processEvent(ctx context.Context, event services.Event) error {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		err := c.provisionerCache.DeleteToken(event.Resource.GetName())
 		if err != nil {
 			// resource could be missing in the cache
@@ -917,7 +917,7 @@ func (c *provisionToken) processEvent(ctx context.Context, event services.Event)
 				return trace.Wrap(err)
 			}
 		}
-	case backend.OpPut:
+	case types.OpPut:
 		resource, ok := event.Resource.(services.ProvisionToken)
 		if !ok {
 			return trace.BadParameter("unexpected type %T", event.Resource)
@@ -982,7 +982,7 @@ func (c *clusterConfig) fetch(ctx context.Context) (apply func(ctx context.Conte
 
 func (c *clusterConfig) processEvent(ctx context.Context, event services.Event) error {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		err := c.clusterConfigCache.DeleteClusterConfig()
 		if err != nil {
 			// resource could be missing in the cache
@@ -993,7 +993,7 @@ func (c *clusterConfig) processEvent(ctx context.Context, event services.Event) 
 				return trace.Wrap(err)
 			}
 		}
-	case backend.OpPut:
+	case types.OpPut:
 		resource, ok := event.Resource.(services.ClusterConfig)
 		if !ok {
 			return trace.BadParameter("unexpected type %T", event.Resource)
@@ -1058,7 +1058,7 @@ func (c *clusterName) fetch(ctx context.Context) (apply func(ctx context.Context
 
 func (c *clusterName) processEvent(ctx context.Context, event services.Event) error {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		err := c.clusterConfigCache.DeleteClusterName()
 		if err != nil {
 			// resource could be missing in the cache
@@ -1069,7 +1069,7 @@ func (c *clusterName) processEvent(ctx context.Context, event services.Event) er
 				return trace.Wrap(err)
 			}
 		}
-	case backend.OpPut:
+	case types.OpPut:
 		resource, ok := event.Resource.(services.ClusterName)
 		if !ok {
 			return trace.BadParameter("unexpected type %T", event.Resource)
@@ -1124,7 +1124,7 @@ func (c *user) fetch(ctx context.Context) (apply func(ctx context.Context) error
 
 func (c *user) processEvent(ctx context.Context, event services.Event) error {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		err := c.usersCache.DeleteUser(ctx, event.Resource.GetName())
 		if err != nil {
 			// resource could be missing in the cache
@@ -1136,7 +1136,7 @@ func (c *user) processEvent(ctx context.Context, event services.Event) error {
 			}
 			return nil
 		}
-	case backend.OpPut:
+	case types.OpPut:
 		resource, ok := event.Resource.(services.User)
 		if !ok {
 			return trace.BadParameter("unexpected type %T", event.Resource)
@@ -1191,7 +1191,7 @@ func (c *role) fetch(ctx context.Context) (apply func(ctx context.Context) error
 
 func (c *role) processEvent(ctx context.Context, event services.Event) error {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		err := c.accessCache.DeleteRole(ctx, event.Resource.GetName())
 		if err != nil {
 			// resource could be missing in the cache
@@ -1202,7 +1202,7 @@ func (c *role) processEvent(ctx context.Context, event services.Event) error {
 				return trace.Wrap(err)
 			}
 		}
-	case backend.OpPut:
+	case types.OpPut:
 		resource, ok := event.Resource.(services.Role)
 		if !ok {
 			return trace.BadParameter("unexpected type %T", event.Resource)
@@ -1257,7 +1257,7 @@ func (a *appServer) fetch(ctx context.Context) (apply func(ctx context.Context) 
 
 func (a *appServer) processEvent(ctx context.Context, event services.Event) error {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		err := a.presenceCache.DeleteAppServer(ctx, event.Resource.GetMetadata().Namespace, event.Resource.GetName())
 		if err != nil {
 			// Resource could be missing in the cache expired or not created, if the
@@ -1267,7 +1267,7 @@ func (a *appServer) processEvent(ctx context.Context, event services.Event) erro
 				return trace.Wrap(err)
 			}
 		}
-	case backend.OpPut:
+	case types.OpPut:
 		resource, ok := event.Resource.(services.Server)
 		if !ok {
 			return trace.BadParameter("unexpected type %T", event.Resource)
@@ -1321,7 +1321,7 @@ func (a *appSession) fetch(ctx context.Context) (apply func(ctx context.Context)
 
 func (a *appSession) processEvent(ctx context.Context, event services.Event) error {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		err := a.appSessionCache.DeleteAppSession(ctx, services.DeleteAppSessionRequest{
 			SessionID: event.Resource.GetName(),
 		})
@@ -1333,7 +1333,7 @@ func (a *appSession) processEvent(ctx context.Context, event services.Event) err
 				return trace.Wrap(err)
 			}
 		}
-	case backend.OpPut:
+	case types.OpPut:
 		resource, ok := event.Resource.(services.WebSession)
 		if !ok {
 			return trace.BadParameter("unexpected type %T", event.Resource)
@@ -1388,7 +1388,7 @@ func (c *kubeService) fetch(ctx context.Context) (apply func(ctx context.Context
 
 func (c *kubeService) processEvent(ctx context.Context, event services.Event) error {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		err := c.presenceCache.DeleteKubeService(ctx, event.Resource.GetName())
 		if err != nil {
 			if !trace.IsNotFound(err) {
@@ -1396,7 +1396,7 @@ func (c *kubeService) processEvent(ctx context.Context, event services.Event) er
 				return trace.Wrap(err)
 			}
 		}
-	case backend.OpPut:
+	case types.OpPut:
 		resource, ok := event.Resource.(services.Server)
 		if !ok {
 			return trace.BadParameter("unexpected type %T", event.Resource)

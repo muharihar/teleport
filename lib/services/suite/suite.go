@@ -32,7 +32,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/gravitational/teleport"
-	"github.com/gravitational/teleport/lib/backend"
+	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/fixtures"
 	"github.com/gravitational/teleport/lib/jwt"
@@ -1751,7 +1751,7 @@ func (s *ServicesTestSuite) runEventsTests(c *check.C, testCases []eventTest) {
 
 	select {
 	case event := <-w.Events():
-		c.Assert(event.Type, check.Equals, backend.OpInit)
+		c.Assert(event.Type, check.Equals, types.OpInit)
 	case <-w.Done():
 		c.Fatalf("Watcher exited with error %v", w.Error())
 	case <-time.After(2 * time.Second):
@@ -1820,7 +1820,7 @@ waitLoop:
 		case <-w.Done():
 			c.Fatalf("Watcher exited with error %v", w.Error())
 		case event := <-w.Events():
-			if event.Type != backend.OpPut {
+			if event.Type != types.OpPut {
 				log.Debugf("Skipping event %v %v", event.Type, event.Resource.GetName())
 				continue
 			}
@@ -1849,7 +1849,7 @@ waitLoop:
 		case <-w.Done():
 			c.Fatalf("Watcher exited with error %v", w.Error())
 		case event := <-w.Events():
-			if event.Type != backend.OpDelete {
+			if event.Type != types.OpDelete {
 				log.Debugf("Skipping stale event %v %v", event.Type, event.Resource.GetName())
 				continue
 			}

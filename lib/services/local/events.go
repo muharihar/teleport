@@ -21,6 +21,7 @@ import (
 	"context"
 	"sort"
 
+	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/lib/backend"
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/services"
@@ -140,7 +141,7 @@ func (w *watcher) Error() error {
 
 func (w *watcher) parseEvent(e backend.Event) (*services.Event, error) {
 	for _, p := range w.parsers {
-		if e.Type == backend.OpInit {
+		if e.Type == types.OpInit {
 			return &services.Event{Type: e.Type}, nil
 		}
 		if p.match(e.Item.Key) {
@@ -243,7 +244,7 @@ type certAuthorityParser struct {
 
 func (p *certAuthorityParser) parse(event backend.Event) (services.Resource, error) {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		caType, name, err := baseTwoKeys(event.Item.Key)
 		if err != nil {
 			return nil, trace.Wrap(err)
@@ -257,7 +258,7 @@ func (p *certAuthorityParser) parse(event backend.Event) (services.Resource, err
 				Namespace: defaults.Namespace,
 			},
 		}, nil
-	case backend.OpPut:
+	case types.OpPut:
 		ca, err := services.GetCertAuthorityMarshaler().UnmarshalCertAuthority(event.Item.Value,
 			services.WithResourceID(event.Item.ID), services.WithExpires(event.Item.Expires), services.SkipValidation())
 		if err != nil {
@@ -284,9 +285,9 @@ type provisionTokenParser struct {
 
 func (p *provisionTokenParser) parse(event backend.Event) (services.Resource, error) {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		return resourceHeader(event, services.KindToken, services.V2, 0)
-	case backend.OpPut:
+	case types.OpPut:
 		token, err := services.UnmarshalProvisionToken(event.Item.Value,
 			services.WithResourceID(event.Item.ID),
 			services.WithExpires(event.Item.Expires),
@@ -312,14 +313,14 @@ type staticTokensParser struct {
 
 func (p *staticTokensParser) parse(event backend.Event) (services.Resource, error) {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		h, err := resourceHeader(event, services.KindStaticTokens, services.V2, 0)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
 		h.SetName(services.MetaNameStaticTokens)
 		return h, nil
-	case backend.OpPut:
+	case types.OpPut:
 		tokens, err := services.GetStaticTokensMarshaler().Unmarshal(event.Item.Value,
 			services.WithResourceID(event.Item.ID),
 			services.WithExpires(event.Item.Expires),
@@ -345,14 +346,14 @@ type clusterConfigParser struct {
 
 func (p *clusterConfigParser) parse(event backend.Event) (services.Resource, error) {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		h, err := resourceHeader(event, services.KindClusterConfig, services.V3, 0)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
 		h.SetName(services.MetaNameClusterConfig)
 		return h, nil
-	case backend.OpPut:
+	case types.OpPut:
 		clusterConfig, err := services.GetClusterConfigMarshaler().Unmarshal(
 			event.Item.Value,
 			services.WithResourceID(event.Item.ID),
@@ -380,14 +381,14 @@ type clusterNameParser struct {
 
 func (p *clusterNameParser) parse(event backend.Event) (services.Resource, error) {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		h, err := resourceHeader(event, services.KindClusterName, services.V2, 0)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
 		h.SetName(services.MetaNameClusterName)
 		return h, nil
-	case backend.OpPut:
+	case types.OpPut:
 		clusterName, err := services.GetClusterNameMarshaler().Unmarshal(event.Item.Value,
 			services.WithResourceID(event.Item.ID),
 			services.WithExpires(event.Item.Expires),
@@ -425,9 +426,9 @@ func (p *namespaceParser) match(key []byte) bool {
 
 func (p *namespaceParser) parse(event backend.Event) (services.Resource, error) {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		return resourceHeader(event, services.KindNamespace, services.V2, 1)
-	case backend.OpPut:
+	case types.OpPut:
 		namespace, err := services.UnmarshalNamespace(event.Item.Value,
 			services.WithResourceID(event.Item.ID),
 			services.WithExpires(event.Item.Expires),
@@ -453,9 +454,9 @@ type roleParser struct {
 
 func (p *roleParser) parse(event backend.Event) (services.Resource, error) {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		return resourceHeader(event, services.KindRole, services.V3, 1)
-	case backend.OpPut:
+	case types.OpPut:
 		resource, err := services.GetRoleMarshaler().UnmarshalRole(event.Item.Value,
 			services.WithResourceID(event.Item.ID),
 			services.WithExpires(event.Item.Expires),
@@ -503,9 +504,9 @@ func (p *accessRequestParser) match(key []byte) bool {
 
 func (p *accessRequestParser) parse(event backend.Event) (services.Resource, error) {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		return resourceHeader(event, services.KindAccessRequest, services.V3, 1)
-	case backend.OpPut:
+	case types.OpPut:
 		req, err := itemToAccessRequest(event.Item)
 		if err != nil {
 			return nil, trace.Wrap(err)
@@ -539,9 +540,9 @@ func (p *userParser) match(key []byte) bool {
 
 func (p *userParser) parse(event backend.Event) (services.Resource, error) {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		return resourceHeader(event, services.KindUser, services.V2, 1)
-	case backend.OpPut:
+	case types.OpPut:
 		resource, err := services.GetUserMarshaler().UnmarshalUser(event.Item.Value,
 			services.WithResourceID(event.Item.ID),
 			services.WithExpires(event.Item.Expires),
@@ -609,7 +610,7 @@ type tunnelConnectionParser struct {
 
 func (p *tunnelConnectionParser) parse(event backend.Event) (services.Resource, error) {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		clusterName, name, err := baseTwoKeys(event.Item.Key)
 		if err != nil {
 			return nil, trace.Wrap(err)
@@ -623,7 +624,7 @@ func (p *tunnelConnectionParser) parse(event backend.Event) (services.Resource, 
 				Namespace: defaults.Namespace,
 			},
 		}, nil
-	case backend.OpPut:
+	case types.OpPut:
 		resource, err := services.UnmarshalTunnelConnection(event.Item.Value,
 			services.WithResourceID(event.Item.ID),
 			services.WithExpires(event.Item.Expires),
@@ -649,9 +650,9 @@ type reverseTunnelParser struct {
 
 func (p *reverseTunnelParser) parse(event backend.Event) (services.Resource, error) {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		return resourceHeader(event, services.KindReverseTunnel, services.V2, 0)
-	case backend.OpPut:
+	case types.OpPut:
 		resource, err := services.UnmarshalReverseTunnel(event.Item.Value,
 			services.WithResourceID(event.Item.ID),
 			services.WithExpires(event.Item.Expires),
@@ -691,9 +692,9 @@ type webSessionParser struct {
 
 func (p *webSessionParser) parse(event backend.Event) (services.Resource, error) {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		return resourceHeader(event, services.KindWebSession, services.V2, 0)
-	case backend.OpPut:
+	case types.OpPut:
 		resource, err := services.GetWebSessionMarshaler().UnmarshalWebSession(event.Item.Value,
 			services.WithResourceID(event.Item.ID),
 			services.WithExpires(event.Item.Expires),
@@ -723,9 +724,9 @@ func (p *kubeServiceParser) parse(event backend.Event) (services.Resource, error
 
 func parseServer(event backend.Event, kind string) (services.Resource, error) {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		return resourceHeader(event, kind, services.V2, 0)
-	case backend.OpPut:
+	case types.OpPut:
 		resource, err := services.GetServerMarshaler().UnmarshalServer(event.Item.Value,
 			kind,
 			services.WithResourceID(event.Item.ID),
@@ -761,9 +762,9 @@ func (p *remoteClusterParser) match(key []byte) bool {
 
 func (p *remoteClusterParser) parse(event backend.Event) (services.Resource, error) {
 	switch event.Type {
-	case backend.OpDelete:
+	case types.OpDelete:
 		return resourceHeader(event, services.KindRemoteCluster, services.V3, 0)
-	case backend.OpPut:
+	case types.OpPut:
 		resource, err := services.UnmarshalRemoteCluster(event.Item.Value,
 			services.WithResourceID(event.Item.ID),
 			services.WithExpires(event.Item.Expires),

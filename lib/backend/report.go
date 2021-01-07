@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/gravitational/teleport"
+	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/trace"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/jonboulle/clockwork"
@@ -107,7 +108,7 @@ func (s *Reporter) GetRange(ctx context.Context, startKey []byte, endKey []byte,
 	if err != nil {
 		batchReadRequestsFailed.WithLabelValues(s.Component).Inc()
 	}
-	s.trackRequest(OpGet, startKey, endKey)
+	s.trackRequest(types.OpGet, startKey, endKey)
 	return res, err
 }
 
@@ -120,7 +121,7 @@ func (s *Reporter) Create(ctx context.Context, i Item) (*Lease, error) {
 	if err != nil {
 		writeRequestsFailed.WithLabelValues(s.Component).Inc()
 	}
-	s.trackRequest(OpPut, i.Key, nil)
+	s.trackRequest(types.OpPut, i.Key, nil)
 	return lease, err
 }
 
@@ -134,7 +135,7 @@ func (s *Reporter) Put(ctx context.Context, i Item) (*Lease, error) {
 	if err != nil {
 		writeRequestsFailed.WithLabelValues(s.Component).Inc()
 	}
-	s.trackRequest(OpPut, i.Key, nil)
+	s.trackRequest(types.OpPut, i.Key, nil)
 	return lease, err
 }
 
@@ -147,7 +148,7 @@ func (s *Reporter) Update(ctx context.Context, i Item) (*Lease, error) {
 	if err != nil {
 		writeRequestsFailed.WithLabelValues(s.Component).Inc()
 	}
-	s.trackRequest(OpPut, i.Key, nil)
+	s.trackRequest(types.OpPut, i.Key, nil)
 	return lease, err
 }
 
@@ -160,7 +161,7 @@ func (s *Reporter) Get(ctx context.Context, key []byte) (*Item, error) {
 	if err != nil && !trace.IsNotFound(err) {
 		readRequestsFailed.WithLabelValues(s.Component).Inc()
 	}
-	s.trackRequest(OpGet, key, nil)
+	s.trackRequest(types.OpGet, key, nil)
 	return item, err
 }
 
@@ -174,7 +175,7 @@ func (s *Reporter) CompareAndSwap(ctx context.Context, expected Item, replaceWit
 	if err != nil && !trace.IsNotFound(err) && !trace.IsCompareFailed(err) {
 		writeRequestsFailed.WithLabelValues(s.Component).Inc()
 	}
-	s.trackRequest(OpPut, expected.Key, nil)
+	s.trackRequest(types.OpPut, expected.Key, nil)
 	return lease, err
 }
 
@@ -187,7 +188,7 @@ func (s *Reporter) Delete(ctx context.Context, key []byte) error {
 	if err != nil && !trace.IsNotFound(err) {
 		writeRequestsFailed.WithLabelValues(s.Component).Inc()
 	}
-	s.trackRequest(OpDelete, key, nil)
+	s.trackRequest(types.OpDelete, key, nil)
 	return err
 }
 
@@ -200,7 +201,7 @@ func (s *Reporter) DeleteRange(ctx context.Context, startKey []byte, endKey []by
 	if err != nil && !trace.IsNotFound(err) {
 		batchWriteRequestsFailed.WithLabelValues(s.Component).Inc()
 	}
-	s.trackRequest(OpDelete, startKey, endKey)
+	s.trackRequest(types.OpDelete, startKey, endKey)
 	return err
 }
 
@@ -216,7 +217,7 @@ func (s *Reporter) KeepAlive(ctx context.Context, lease Lease, expires time.Time
 	if err != nil && !trace.IsNotFound(err) {
 		writeRequestsFailed.WithLabelValues(s.Component).Inc()
 	}
-	s.trackRequest(OpPut, lease.Key, nil)
+	s.trackRequest(types.OpPut, lease.Key, nil)
 	return err
 }
 
@@ -255,7 +256,7 @@ type topRequestsCacheKey struct {
 }
 
 // trackRequests tracks top requests, endKey is supplied for ranges
-func (s *Reporter) trackRequest(opType OpType, key []byte, endKey []byte) {
+func (s *Reporter) trackRequest(opType types.OpType, key []byte, endKey []byte) {
 	if len(key) == 0 {
 		return
 	}

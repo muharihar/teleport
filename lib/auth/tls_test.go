@@ -38,7 +38,6 @@ import (
 	"github.com/gravitational/teleport/api/client"
 	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/api/types"
-	"github.com/gravitational/teleport/lib/backend"
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/events"
 	"github.com/gravitational/teleport/lib/fixtures"
@@ -2674,7 +2673,7 @@ func (s *TLSSuite) TestEventsPermissions(c *check.C) {
 	case <-time.After(2 * time.Second):
 		c.Fatalf("Timeout waiting for init event")
 	case event := <-w.Events():
-		c.Assert(event.Type, check.Equals, backend.OpInit)
+		c.Assert(event.Type, check.Equals, types.OpInit)
 	}
 
 	// start rotation
@@ -2807,7 +2806,7 @@ func (s *TLSSuite) TestEventsClusterConfig(c *check.C) {
 	case <-time.After(2 * time.Second):
 		c.Fatalf("Timeout waiting for init event")
 	case event := <-w.Events():
-		c.Assert(event.Type, check.Equals, backend.OpInit)
+		c.Assert(event.Type, check.Equals, types.OpInit)
 	}
 
 	// start rotation

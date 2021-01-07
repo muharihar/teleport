@@ -35,9 +35,9 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 
 	"github.com/gravitational/teleport"
+	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/lib/asciitable"
 	"github.com/gravitational/teleport/lib/auth"
-	"github.com/gravitational/teleport/lib/backend"
 	"github.com/gravitational/teleport/lib/benchmark"
 	"github.com/gravitational/teleport/lib/client"
 	"github.com/gravitational/teleport/lib/client/identityfile"
@@ -1645,10 +1645,10 @@ Loop:
 		select {
 		case event := <-watcher.Events():
 			switch event.Type {
-			case backend.OpInit:
+			case types.OpInit:
 				log.Infof("Access-request watcher initialized...")
 				continue Loop
-			case backend.OpPut:
+			case types.OpPut:
 				r, ok := event.Resource.(*services.AccessRequestV3)
 				if !ok {
 					return nil, trace.BadParameter("unexpected resource type %T", event.Resource)
@@ -1658,7 +1658,7 @@ Loop:
 					continue Loop
 				}
 				return r, nil
-			case backend.OpDelete:
+			case types.OpDelete:
 				if event.Resource.GetName() != req.GetName() {
 					log.Debugf("Skipping delete event id=%s", event.Resource.GetName())
 					continue Loop

@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/gravitational/teleport"
-	"github.com/gravitational/teleport/lib/backend"
+	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/events"
 	"github.com/gravitational/teleport/lib/httplib"
@@ -198,7 +198,7 @@ func (h *Handler) waitForSession(ctx context.Context, sessionID string) error {
 	select {
 	// Received an event, first event should always be an initialize event.
 	case event := <-watcher.Events():
-		if event.Type != backend.OpInit {
+		if event.Type != types.OpInit {
 			return trace.BadParameter("expected init event, got %v instead", event.Type)
 		}
 	// Watcher closed, probably due to a network error.
@@ -224,7 +224,7 @@ func (h *Handler) waitForSession(ctx context.Context, sessionID string) error {
 			if event.Resource.GetKind() != services.KindWebSession {
 				return trace.BadParameter("unexpected event: %v.", event.Resource.GetKind())
 			}
-			if event.Type == backend.OpPut && event.Resource.GetName() == sessionID {
+			if event.Type == types.OpPut && event.Resource.GetName() == sessionID {
 				return nil
 			}
 		// Watcher closed, probably due to a network error.

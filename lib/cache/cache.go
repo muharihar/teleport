@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/gravitational/teleport"
+	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/lib/backend"
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/services"
@@ -764,7 +765,7 @@ func (c *Cache) fetchAndWatch(ctx context.Context, retry utils.Retry, timer *tim
 	case <-c.ctx.Done():
 		return trace.ConnectionProblem(c.ctx.Err(), "context is closing")
 	case event := <-watcher.Events():
-		if event.Type != backend.OpInit {
+		if event.Type != types.OpInit {
 			return trace.BadParameter("expected init event, got %v instead", event.Type)
 		}
 	case <-timer.C:

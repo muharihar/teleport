@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gravitational/teleport/api/types"
+
 	"github.com/jonboulle/clockwork"
 )
 
@@ -156,45 +158,10 @@ type GetResult struct {
 	Items []Item
 }
 
-// OpType specifies operation type
-type OpType int
-
-const (
-	// OpInvalid is returned for invalid operations
-	OpInvalid OpType = iota - 1
-	// OpInit is returned by the system whenever the system
-	// is initialized, init operation is always sent
-	// as a first event over the channel, so the client
-	// can verify that watch has been established.
-	OpInit
-	// OpPut is returned for Put events
-	OpPut
-	// OpDelete is returned for Delete events
-	OpDelete
-	// OpGet is used for tracking, not present in the event stream
-	OpGet
-)
-
-// String returns user-friendly description of the operation
-func (o OpType) String() string {
-	switch o {
-	case OpInit:
-		return "Init"
-	case OpPut:
-		return "Put"
-	case OpDelete:
-		return "Delete"
-	case OpGet:
-		return "Get"
-	default:
-		return "unknown"
-	}
-}
-
 // Event is a event containing operation with item
 type Event struct {
 	// Type is operation type
-	Type OpType
+	Type types.OpType
 	// Item is event Item
 	Item Item
 }
