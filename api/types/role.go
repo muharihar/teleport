@@ -30,7 +30,6 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/gravitational/trace"
-	"github.com/jonboulle/clockwork"
 	"github.com/vulcand/predicate"
 )
 
@@ -187,7 +186,7 @@ func (r *RoleV3) Expiry() time.Time {
 }
 
 // SetTTL sets TTL header using realtime clock.
-func (r *RoleV3) SetTTL(clock clockwork.Clock, ttl time.Duration) {
+func (r *RoleV3) SetTTL(clock ttlClock, ttl time.Duration) {
 	r.Metadata.SetTTL(clock, ttl)
 }
 
