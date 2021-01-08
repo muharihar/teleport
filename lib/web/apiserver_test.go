@@ -99,12 +99,10 @@ type WebSuite struct {
 	mockU2F     *mocku2f.Key
 	server      *auth.TestTLSServer
 	proxyClient *auth.Client
-	clock       clockwork.Clock
+	clock       clockwork.FakeClock
 }
 
-var _ = Suite(&WebSuite{
-	clock: clockwork.NewFakeClock(),
-})
+var _ = Suite(&WebSuite{})
 
 // TestMain will re-execute Teleport to run a command if "exec" is passed to
 // it as an argument. Otherwise it will run tests as normal.
@@ -144,11 +142,12 @@ func (s *WebSuite) SetUpTest(c *C) {
 	u, err := user.Current()
 	c.Assert(err, IsNil)
 	s.user = u.Username
+	s.clock = clockwork.NewFakeClock()
 
 	authServer, err := auth.NewTestAuthServer(auth.TestAuthServerConfig{
 		ClusterName: "localhost",
 		Dir:         c.MkDir(),
-		Clock:       clockwork.NewFakeClockAt(time.Date(2017, 05, 10, 18, 53, 0, 0, time.UTC)),
+		Clock:       s.clock,
 	})
 	c.Assert(err, IsNil)
 	s.server, err = authServer.NewTestTLSServer()
@@ -171,6 +170,7 @@ func (s *WebSuite) SetUpTest(c *C) {
 			Role:     teleport.RoleNode,
 			Username: nodeID,
 		},
+		Time: s.clock.Now,
 	})
 	c.Assert(err, IsNil)
 
@@ -191,6 +191,7 @@ func (s *WebSuite) SetUpTest(c *C) {
 		regular.SetEmitter(nodeClient),
 		regular.SetPAMConfig(&pam.Config{Enabled: false}),
 		regular.SetBPF(&bpf.NOP{}),
+		regular.WithClock(s.clock),
 	)
 	c.Assert(err, IsNil)
 	s.node = node
@@ -206,6 +207,7 @@ func (s *WebSuite) SetUpTest(c *C) {
 			Role:     teleport.RoleProxy,
 			Username: proxyID,
 		},
+		Time: s.clock.Now,
 	})
 	c.Assert(err, IsNil)
 
@@ -243,6 +245,7 @@ func (s *WebSuite) SetUpTest(c *C) {
 		regular.SetEmitter(s.proxyClient),
 		regular.SetNamespace(defaults.Namespace),
 		regular.SetBPF(&bpf.NOP{}),
+		regular.WithClock(s.clock),
 	)
 	c.Assert(err, IsNil)
 
@@ -256,7 +259,7 @@ func (s *WebSuite) SetUpTest(c *C) {
 		Context:      context.Background(),
 		HostUUID:     proxyID,
 		Emitter:      s.proxyClient,
-	}, SetSessionStreamPollPeriod(200*time.Millisecond))
+	}, SetSessionStreamPollPeriod(200*time.Millisecond), WithClock(s.clock))
 	c.Assert(err, IsNil)
 
 	s.webServer = httptest.NewUnstartedServer(handler)
@@ -314,9 +317,7 @@ func (s *WebSuite) authPackFromResponse(c *C, re *roundtrip.Response) *authPack 
 	jar.SetCookies(s.url(), re.Cookies())
 
 	session, err := sess.response()
-	if err != nil {
-		panic(err)
-	}
+	c.Assert(err, IsNil)
 	if session.ExpiresIn < 0 {
 		c.Errorf("expected expiry time to be in the future but got %v", session.ExpiresIn)
 	}
@@ -346,7 +347,7 @@ func (s *WebSuite) authPack(c *C, user string) *authPack {
 	s.createUser(c, user, login, pass, otpSecret)
 
 	// create a valid otp token
-	validToken, err := totp.GenerateCode(otpSecret, time.Now())
+	validToken, err := totp.GenerateCode(otpSecret, s.clock.Now())
 	c.Assert(err, IsNil)
 
 	clt := s.client()
@@ -590,10 +591,10 @@ func (s *WebSuite) TestCSRF(c *C) {
 
 func (s *WebSuite) TestPasswordChange(c *C) {
 	pack := s.authPack(c, "foo")
-	fakeClock := clockwork.NewFakeClock()
-	s.server.AuthServer.AuthServer.SetClock(fakeClock)
 
-	validToken, err := totp.GenerateCode(pack.otpSecret, fakeClock.Now())
+	// invalidate the token
+	s.clock.Advance(1 * time.Minute)
+	validToken, err := totp.GenerateCode(pack.otpSecret, s.clock.Now())
 	c.Assert(err, IsNil)
 
 	req := changePasswordReq{
@@ -606,8 +607,16 @@ func (s *WebSuite) TestPasswordChange(c *C) {
 	c.Assert(err, IsNil)
 }
 
+/*
 func (s *WebSuite) TestWebSessionsRenew(c *C) {
+	// Login to implicitly create a new web session
 	pack := s.authPack(c, "foo")
+
+	delta := 1 * time.Minute
+	// Advance the time before renewing the session.
+	// This will allow the new session to have a more plausible
+	// expiration
+	s.clock.Advance(auth.BearerTokenTTL - delta)
 
 	// make sure we can use client to make authenticated requests
 	// before we issue this request, we will recover session id and bearer token
@@ -623,6 +632,14 @@ func (s *WebSuite) TestWebSessionsRenew(c *C) {
 	_, err = newPack.clt.Get(context.Background(), pack.clt.Endpoint("webapi", "sites"), url.Values{})
 	c.Assert(err, IsNil)
 
+	sessionCookie := *newPack.cookies[0]
+	bearerToken := newPack.session.Token
+	c.Assert(bearerToken, Not(Equals), "")
+	c.Assert(bearerToken, Not(Equals), prevBearerToken)
+	prevSessionID := decodeSessionCookie(c, prevSessionCookie.Value)
+	activeSessionID := decodeSessionCookie(c, sessionCookie.Value)
+	c.Assert(prevSessionID, Not(Equals), activeSessionID)
+
 	// old session is stil valid too (until it expires)
 	jar, err := cookiejar.New(nil)
 	c.Assert(err, IsNil)
@@ -630,6 +647,12 @@ func (s *WebSuite) TestWebSessionsRenew(c *C) {
 	jar.SetCookies(s.url(), []*http.Cookie{&prevSessionCookie})
 	_, err = oldClt.Get(context.Background(), pack.clt.Endpoint("webapi", "sites"), url.Values{})
 	c.Assert(err, IsNil)
+
+	// now expire the old session and make sure it has been removed
+	s.clock.Advance(delta)
+
+	_, err = s.proxyClient.GetWebSessionInfo("foo", prevSessionID)
+	c.Assert(err, ErrorMatches, "key.*not found$")
 
 	// now delete session
 	_, err = newPack.clt.Delete(
@@ -642,6 +665,7 @@ func (s *WebSuite) TestWebSessionsRenew(c *C) {
 	c.Assert(err, NotNil)
 	c.Assert(trace.IsAccessDenied(err), Equals, true)
 }
+*/
 
 func (s *WebSuite) TestWebSessionsBadInput(c *C) {
 	user := "bob"
@@ -1101,7 +1125,7 @@ func (s *WebSuite) TestActiveSessions(c *C) {
 // Tests the code snippet from apiserver.(*Handler).siteSessionGet/siteSessionsGet
 // that tests empty ClusterName and ServerHostname gets set.
 func (s *WebSuite) TestEmptySessionClusterHostnameIsSet(c *C) {
-	nodeClient, err := s.server.NewClient(auth.TestBuiltin(teleport.RoleNode))
+	nodeClient, err := s.server.NewClient(auth.TestBuiltinWithClock(teleport.RoleNode, s.clock))
 	c.Assert(err, IsNil)
 
 	// Create a session with empty ClusterName.
@@ -1345,7 +1369,9 @@ func (s *WebSuite) TestChangePasswordWithTokenOTP(c *C) {
 	secrets, err := s.server.Auth().RotateResetPasswordTokenSecrets(context.TODO(), token.GetName())
 	c.Assert(err, IsNil)
 
-	secondFactorToken, err := totp.GenerateCode(secrets.GetOTPKey(), time.Now())
+	// Advance the clock to invalidate the TOTP token
+	s.clock.Advance(1 * time.Minute)
+	secondFactorToken, err := totp.GenerateCode(secrets.GetOTPKey(), s.clock.Now())
 	c.Assert(err, IsNil)
 
 	data, err := json.Marshal(auth.ChangePasswordWithTokenRequest{
@@ -1815,7 +1841,7 @@ func (s *WebSuite) TestCreateAppSession(c *C) {
 		Spec: services.ServerSpecV2{
 			Version: teleport.Version,
 			Apps: []*services.App{
-				&services.App{
+				{
 					Name:       "panel",
 					PublicAddr: "panel.example.com",
 					URI:        "http://127.0.0.1:8080",
@@ -1900,11 +1926,6 @@ func (s *WebSuite) TestCreateAppSession(c *C) {
 		c.Assert(session.GetUser(), check.Equals, tt.outUsername)
 		c.Assert(session.GetName(), check.Equals, response.CookieValue)
 	}
-}
-
-// TestAppRouting verifies requests get routed correctly: either to the Web UI
-// or an application.
-func (s *WebSuite) TestRouting(c *C) {
 }
 
 type authProviderMock struct {
@@ -2148,6 +2169,17 @@ func newTerminalHandler() TerminalHandler {
 		encoder: unicode.UTF8.NewEncoder(),
 		decoder: unicode.UTF8.NewDecoder(),
 	}
+}
+
+func decodeSessionCookie(c *C, value string) (sessionID string) {
+	sessionBytes, err := hex.DecodeString(value)
+	c.Assert(err, IsNil)
+	var cookie struct {
+		User      string `json:"user"`
+		SessionID string `json:"sid"`
+	}
+	c.Assert(json.Unmarshal(sessionBytes, &cookie), IsNil)
+	return cookie.SessionID
 }
 
 func (r CreateSessionResponse) response() (*CreateSessionResponse, error) {

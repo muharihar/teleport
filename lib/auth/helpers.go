@@ -160,13 +160,13 @@ func NewTestAuthServer(cfg TestAuthServerConfig) (*TestAuthServer, error) {
 
 	srv.AuthServer, err = NewServer(&InitConfig{
 		Backend:                srv.Backend,
-		Authority:              authority.New(),
+		Authority:              authority.NewWithConfig(cfg.Clock),
 		Access:                 access,
 		Identity:               identity,
 		AuditLog:               srv.AuditLog,
 		SkipPeriodicOperations: true,
 		Emitter:                localLog,
-	})
+	}, WithClock(cfg.Clock))
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -214,13 +214,25 @@ func NewTestAuthServer(cfg TestAuthServerConfig) (*TestAuthServer, error) {
 	}
 
 	// Setup certificate and signing authorities.
-	if err = srv.AuthServer.UpsertCertAuthority(suite.NewTestCA(services.HostCA, srv.ClusterName)); err != nil {
+	if err = srv.AuthServer.UpsertCertAuthority(suite.NewTestCAWithConfig(suite.TestCAConfig{
+		Type:        services.HostCA,
+		ClusterName: srv.ClusterName,
+		Clock:       cfg.Clock,
+	})); err != nil {
 		return nil, trace.Wrap(err)
 	}
-	if err = srv.AuthServer.UpsertCertAuthority(suite.NewTestCA(services.UserCA, srv.ClusterName)); err != nil {
+	if err = srv.AuthServer.UpsertCertAuthority(suite.NewTestCAWithConfig(suite.TestCAConfig{
+		Type:        services.UserCA,
+		ClusterName: srv.ClusterName,
+		Clock:       cfg.Clock,
+	})); err != nil {
 		return nil, trace.Wrap(err)
 	}
-	if err = srv.AuthServer.UpsertCertAuthority(suite.NewTestCA(services.JWTSigner, srv.ClusterName)); err != nil {
+	if err = srv.AuthServer.UpsertCertAuthority(suite.NewTestCAWithConfig(suite.TestCAConfig{
+		Type:        services.JWTSigner,
+		ClusterName: srv.ClusterName,
+		Clock:       cfg.Clock,
+	})); err != nil {
 		return nil, trace.Wrap(err)
 	}
 
@@ -461,6 +473,7 @@ func NewTestTLSServer(cfg TestTLSServerConfig) (*TestTLSServer, error) {
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
+	tlsConfig.Time = cfg.AuthServer.Clock().Now
 
 	accessPoint, err := NewAdminAuthServer(srv.AuthServer.AuthServer, srv.AuthServer.SessionServer, srv.AuthServer.AuditLog)
 	if err != nil {
@@ -495,6 +508,9 @@ type TestIdentity struct {
 	TTL            time.Duration
 	AcceptedUsage  []string
 	RouteToCluster string
+	// Time specifies the time as number of seconds since epoch.
+	// If unspecified, time.Now() will be used
+	Time func() time.Time
 }
 
 // TestUser returns TestIdentity for local user
@@ -516,6 +532,14 @@ func TestNop() TestIdentity {
 // TestAdmin returns TestIdentity for admin user
 func TestAdmin() TestIdentity {
 	return TestBuiltin(teleport.RoleAdmin)
+}
+
+// TestBuiltinWithClock creates a new builtin user identity
+// with the specified clock
+func TestBuiltinWithClock(role teleport.Role, clock clockwork.Clock) TestIdentity {
+	identity := TestBuiltin(role)
+	identity.Time = clock.Now
+	return identity
 }
 
 // TestBuiltin returns TestIdentity for builtin user
@@ -579,6 +603,7 @@ func (t *TestTLSServer) ClientTLSConfig(identity TestIdentity) (*tls.Config, err
 		// server should apply Nop builtin role
 		tlsConfig.Certificates = nil
 	}
+	tlsConfig.Time = identity.Time
 	return tlsConfig, nil
 }
 

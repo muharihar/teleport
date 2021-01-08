@@ -92,6 +92,14 @@ func SetSessionStreamPollPeriod(period time.Duration) HandlerOption {
 	}
 }
 
+// WithClock sets the clock on a handler
+func WithClock(clock clockwork.Clock) HandlerOption {
+	return func(h *Handler) error {
+		h.clock = clock
+		return nil
+	}
+}
+
 // Config represents web handler configuration parameters
 type Config struct {
 	// Proxy is a reverse tunnel proxy that handles connections
@@ -199,6 +207,7 @@ func NewHandler(cfg Config, opts ...HandlerOption) (*RewritingHandler, error) {
 	if h.clock == nil {
 		h.clock = clockwork.NewRealClock()
 	}
+	h.auth.clock = h.clock
 
 	// ping endpoint is used to check if the server is up. the /webapi/ping
 	// endpoint returns the default authentication method and configuration that
@@ -1190,7 +1199,7 @@ func NewSessionResponse(ctx *SessionContext) (*CreateSessionResponse, error) {
 	return &CreateSessionResponse{
 		Type:      roundtrip.AuthBearer,
 		Token:     webSession.GetBearerToken(),
-		ExpiresIn: int(time.Until(webSession.GetBearerTokenExpiryTime()) / time.Second),
+		ExpiresIn: int(webSession.GetBearerTokenExpiryTime().Sub(ctx.parent.clock.Now()) / time.Second),
 	}, nil
 }
 

@@ -331,6 +331,7 @@ func newSessionCache(proxyClient auth.ClientI, servers []utils.NetAddr, cipherSu
 		closer:       utils.NewCloseBroadcaster(),
 		cipherSuites: cipherSuites,
 		log:          newPackageLogger(),
+		clock:        clockwork.NewRealClock(),
 	}
 	// periodically close expired and unused sessions
 	go cache.expireSessions()
@@ -347,6 +348,7 @@ type sessionCache struct {
 	authServers []utils.NetAddr
 	closer      *utils.CloseBroadcaster
 	clusterName string
+	clock       clockwork.Clock
 
 	// cipherSuites is the list of supported TLS cipher suites.
 	cipherSuites []uint16
@@ -576,6 +578,7 @@ func (s *sessionCache) ValidateSession(user, sid string) (*SessionContext, error
 	tlsConfig.Certificates = []tls.Certificate{tlsCert}
 	tlsConfig.RootCAs = certPool
 	tlsConfig.ServerName = auth.EncodeClusterName(s.clusterName)
+	tlsConfig.Time = s.clock.Now
 
 	userClient, err := auth.NewClient(apiclient.Config{
 		Addrs: utils.NetAddrsToStrings(s.authServers),
