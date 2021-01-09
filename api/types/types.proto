@@ -309,7 +309,7 @@ message ProvisionTokenV1 {
     // certificates issued to the user of the token
     repeated string Roles = 1 [
         (gogoproto.jsontag) = "roles",
-        (gogoproto.casttype) = "github.com/gravitational/teleport.Role"
+        (gogoproto.casttype) = "github.com/gravitational/teleport/api/constants.Role"
     ];
     // Expires is a global expiry time header can be set on any resource in the
     // system.
@@ -346,7 +346,7 @@ message ProvisionTokenSpecV2 {
     // certificates issued to the user of the token
     repeated string Roles = 1 [
         (gogoproto.jsontag) = "roles",
-        (gogoproto.casttype) = "github.com/gravitational/teleport.Role"
+        (gogoproto.casttype) = "github.com/gravitational/teleport/api/constants.Role"
     ];
 }
 
